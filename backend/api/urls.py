@@ -1,12 +1,11 @@
-# backend/api/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import UserViewSet, FYPProjectViewSet
+from .views import UserViewSet, FYPProjectViewSet, TimetableBookingViewSet
 
-# 创建一个路由器，它会自动为我们的ViewSet生成所有URL
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
 router.register(r'projects', FYPProjectViewSet)
+router.register(r'bookings', TimetableBookingViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
