@@ -11,3 +11,5 @@ class UserViewSet(viewsets.ModelViewSet):
 class FYPProjectViewSet(viewsets.ModelViewSet):
     queryset = FYPProject.objects.all()
     serializer_class = FYPProjectSerializer
+    
+    ordering = ['student_matric_id'] 
