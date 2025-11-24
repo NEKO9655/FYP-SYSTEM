@@ -34,15 +34,7 @@ class TimetableBooking(models.Model):
         if self.project:
             return f"Booking for '{self.project.title}' by {self.lecturer.username}"
         return f"Availability for {self.lecturer.username}"
-    
-class LecturerAvailability(models.Model):
-    lecturer = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'lecturer'})
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
-
-    def __str__(self):
-        return f"{self.lecturer.username}: {self.start_time.strftime('%Y-%m-%d %H:%M')} to {self.end_time.strftime('%Y-%m-%d %H:%M')}"
-
+  
 class TimetableSlot(models.Model):
     project = models.ForeignKey(FYPProject, on_delete=models.CASCADE)
     start_time = models.DateTimeField()
