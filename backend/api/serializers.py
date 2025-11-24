@@ -8,10 +8,9 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role']
 
 class FYPProjectSerializer(serializers.ModelSerializer):
-    # 我们可以让它自动显示关联的 "student" 和 "supervisor" 的详细信息
     student = UserSerializer(read_only=True)
     supervisor = UserSerializer(read_only=True)
 
     class Meta:
         model = FYPProject
-        fields = ['id', 'title', 'student', 'supervisor']
+        fields = ['id', 'title', 'student', 'student_matric_id', 'supervisor', 'co_supervisor', ]

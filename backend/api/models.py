@@ -12,7 +12,7 @@ class User(AbstractUser):
 class FYPProject(models.Model):
     student = models.OneToOneField(User, on_delete=models.CASCADE, limit_choices_to={'role': 'student'})
     
-    student_id = models.CharField(max_length=50, blank=True)
+    student_matric_id = models.CharField(max_length=50, blank=True, verbose_name="Student ID")
     
     title = models.CharField(max_length=255)
     supervisor = models.ForeignKey(User, related_name='supervised_projects', on_delete=models.SET_NULL, null=True, limit_choices_to={'role': 'lecturer'})
