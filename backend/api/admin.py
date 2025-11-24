@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, FYPProject, LecturerAvailability, TimetableSlot
+from .models import User, FYPProject, TimetableBooking, TimetableSlot
 
 class CustomUserAdmin(UserAdmin):
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'role')
@@ -18,5 +18,5 @@ class FYPProjectAdmin(admin.ModelAdmin):
 
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(FYPProject, FYPProjectAdmin)
-admin.site.register(LecturerAvailability)
+admin.site.register(TimetableBooking)
 admin.site.register(TimetableSlot)

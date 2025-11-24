@@ -15,3 +15,7 @@ class FYPProjectViewSet(viewsets.ModelViewSet):
 class TimetableBookingViewSet(viewsets.ModelViewSet):
     queryset = TimetableBooking.objects.all()
     serializer_class = TimetableBookingSerializer
+
+class TimetableSlotViewSet(viewsets.ModelViewSet):
+    queryset = TimetableSlot.objects.all()
+    serializer_class = TimetableSlotSerializer
