@@ -1,6 +1,6 @@
 # backend/api/serializers.py
 from rest_framework import serializers
-from .models import User, FYPProject, TimetableBooking
+from .models import User, FYPProject, TimetableBooking, TimetableSlot
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -21,3 +21,10 @@ class TimetableBookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimetableBooking
         fields = ['id', 'lecturer', 'start_time', 'end_time', 'project']
+
+class TimetableSlotSerializer(serializers.ModelSerializer):
+    project = FYPProjectSerializer(read_only=True)
+
+    class Meta:
+        model = TimetableSlot
+        fields = ['id', 'project', 'start_time', 'end_time', 'venue']

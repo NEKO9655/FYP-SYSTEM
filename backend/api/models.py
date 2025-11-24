@@ -41,5 +41,7 @@ class TimetableSlot(models.Model):
     end_time = models.DateTimeField()
     examiners = models.ManyToManyField(User, limit_choices_to={'role': 'lecturer'})
 
+    venue = models.CharField(max_length=100, blank=True)
+
     def __str__(self):
         return f"Slot for {self.project.title} at {self.start_time.strftime('%Y-%m-%d %H:%M')}"
