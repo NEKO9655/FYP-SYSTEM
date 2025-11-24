@@ -11,9 +11,15 @@ class User(AbstractUser):
 
 class FYPProject(models.Model):
     student = models.OneToOneField(User, on_delete=models.CASCADE, limit_choices_to={'role': 'student'})
+    
+    student_id = models.CharField(max_length=50, blank=True)
+    
     title = models.CharField(max_length=255)
     supervisor = models.ForeignKey(User, related_name='supervised_projects', on_delete=models.SET_NULL, null=True, limit_choices_to={'role': 'lecturer'})
     
+    co_supervisor = models.ForeignKey(User, related_name='cosupervised_projects', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'role': 'lecturer'})
+    examiner = models.ForeignKey(User, related_name='examined_projects', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'role': 'lecturer'})
+
     def __str__(self):
         return self.title
 
