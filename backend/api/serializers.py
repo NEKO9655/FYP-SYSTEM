@@ -10,6 +10,8 @@ class UserSerializer(serializers.ModelSerializer):
 class FYPProjectSerializer(serializers.ModelSerializer):
     student = UserSerializer(read_only=True)
     supervisor = UserSerializer(read_only=True)
+    co_supervisor = UserSerializer(read_only=True)
+    examiner = UserSerializer(read_only=True)
 
     class Meta:
         model = FYPProject
