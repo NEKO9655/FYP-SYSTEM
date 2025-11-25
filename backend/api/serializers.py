@@ -22,7 +22,7 @@ class FYPProjectSerializer(serializers.ModelSerializer):
 class TimetableBookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimetableBooking
-        fields = ['id', 'lecturer', 'start_time', 'end_time', 'project']
+        fields = ['id', 'lecturer', 'start_time', 'end_time', 'project', 'examiner']
 
 class TimetableSlotSerializer(serializers.ModelSerializer):
     project = FYPProjectSerializer(read_only=True)

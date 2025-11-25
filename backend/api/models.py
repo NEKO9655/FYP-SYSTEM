@@ -35,8 +35,9 @@ class TimetableBooking(models.Model):
     lecturer = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'lecturer'})
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
-    
     project = models.ForeignKey(FYPProject, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    examiner = models.ForeignKey(User, related_name='booking_examiner', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'role': 'lecturer'})
 
     def __str__(self):
         if self.project:
