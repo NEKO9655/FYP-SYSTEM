@@ -10,11 +10,13 @@ class CustomUserAdmin(UserAdmin):
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Custom Fields', {'fields': ('role',)}),
     )
+    search_fields = ('username', 'first_name', 'last_name', 'email')
 
 class FYPProjectAdmin(admin.ModelAdmin):
     list_display = ('title', 'student', 'supervisor', 'co_supervisor', 'examiner')
     list_filter = ('supervisor', 'examiner')
     search_fields = ('title', 'student__username')
+    raw_id_fields = ('student', 'supervisor', 'co_supervisor', 'examiner')
 
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(FYPProject, FYPProjectAdmin)
