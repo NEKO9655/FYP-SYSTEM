@@ -15,29 +15,14 @@ class CustomUserChangeForm(UserChangeForm):
 
 
 class CustomUserAdmin(BaseUserAdmin):
-    form = CustomUserChangeForm
-    add_form = CustomUserCreationForm
-
-    list_display = ('username', 'get_full_name', 'email', 'is_staff', 'role')
-    search_fields = ('username', 'first_name', 'last_name', 'email')
-    list_filter = ('role', 'is_staff', 'is_superuser')
-
-    fieldsets = (
-        (None, {'fields': ('username', 'password')}),
-        ('Personal info', {'fields': ('first_name', 'last_name', 'email')}),
-        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
-        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+    fieldsets = BaseUserAdmin.fieldsets + (
         ('Custom Fields', {'fields': ('role',)}),
     )
     
-    add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields': ('username', 'first_name', 'last_name', 'email', 'role', 'password', 'password2'),
-        }),
-    )
-
-    ordering = ('username',)
+    add_fieldsets = BaseUserAdmin.add_fieldsets
+    list_display = ('username', 'get_full_name', 'email', 'is_staff', 'role')
+    search_fields = ('username', 'first_name', 'last_name', 'email')
+    list_filter = ('role', 'is_staff')
 
 class FYPProjectAdmin(admin.ModelAdmin):
     list_display = ('title', 'student', 'supervisor')
