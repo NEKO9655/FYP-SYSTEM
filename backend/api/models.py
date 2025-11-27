@@ -3,6 +3,8 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.utils.translation import gettext_lazy as _
 
 class User(AbstractUser):
     first_name = None
@@ -16,6 +18,27 @@ class User(AbstractUser):
 
     full_name = models.CharField(max_length=255, blank=True, verbose_name="Full Name (as per NRIC)")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
+
+    groups = models.ManyToManyField(
+        Group,
+        verbose_name=_('groups'),
+        blank=True,
+        help_text=_(
+            'The groups this user belongs to. A user will get all permissions '
+            'granted to each of their groups.'
+        ),
+        related_name="api_user_set",
+        related_query_name="user",
+    )
+
+    user_permissions = models.ManyToManyField(
+        Permission,
+        verbose_name=_('user permissions'),
+        blank=True,
+        help_text=_('Specific permissions for this user.'),
+        related_name="api_user_permissions_set",
+        related_query_name="user",
+    )
 
     def get_full_name(self):
         return self.full_name or self.username
