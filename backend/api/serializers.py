@@ -1,13 +1,14 @@
-# backend/api/serializers.py
 from rest_framework import serializers
-from .models import User, FYPProject, TimetableBooking, TimetableSlot
+from django.contrib.auth.models import User
+from .models import Profile, FYPProject, TimetableBooking, TimetableSlot
 
 class UserSerializer(serializers.ModelSerializer):
-    full_name = serializers.CharField(source='get_full_name', read_only=True)
-    
+    full_name = serializers.CharField(source='profile.full_name', read_only=True)
+    role = serializers.CharField(source='profile.role', read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role']
+        fields = ['id', 'username', 'full_name', 'email', 'role']
 
 class FYPProjectSerializer(serializers.ModelSerializer):
     student = UserSerializer(read_only=True)
@@ -17,12 +18,14 @@ class FYPProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FYPProject
-        fields = ['id', 'title', 'student', 'student_matric_id', 'supervisor', 'co_supervisor', 'examiner' ]
+        fields = ['id', 'title', 'student', 'student_matric_id', 'supervisor', 'co_supervisor', 'examiner']
+
 
 class TimetableBookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimetableBooking
         fields = ['id', 'lecturer', 'start_time', 'end_time', 'project', 'examiner']
+
 
 class TimetableSlotSerializer(serializers.ModelSerializer):
     project = FYPProjectSerializer(read_only=True)
