@@ -1,73 +1,40 @@
+# --- File: backend/api/models.py (FINAL VERSION) ---
+
 from django.db import models
-from django.contrib.auth.models import AbstractUser
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User # Use Django's built-in User model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.auth.models import AbstractUser, Group, Permission
-from django.utils.translation import gettext_lazy as _
 
-class User(AbstractUser):
-    first_name = None
-    last_name = None
-
-    ROLE_CHOICES = (
-        ('student', 'Student'),
-        ('lecturer', 'Lecturer'),
-        ('coordinator', 'Coordinator'),
-    )
-
-    full_name = models.CharField(max_length=255, blank=True, verbose_name="Full Name (as per NRIC)")
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
-
-    groups = models.ManyToManyField(
-        Group,
-        verbose_name=_('groups'),
-        blank=True,
-        help_text=_(
-            'The groups this user belongs to. A user will get all permissions '
-            'granted to each of their groups.'
-        ),
-        related_name="api_user_set",
-        related_query_name="user",
-    )
-
-    user_permissions = models.ManyToManyField(
-        Permission,
-        verbose_name=_('user permissions'),
-        blank=True,
-        help_text=_('Specific permissions for this user.'),
-        related_name="api_user_permissions_set",
-        related_query_name="user",
-    )
-
-    def get_full_name(self):
-        return self.full_name or self.username
-
-    def __str__(self):
-        return self.get_full_name()
-
+# --- Profile Model ---
+# This model stores all our custom user information.
 class Profile(models.Model):
     ROLE_CHOICES = (
         ('student', 'Student'),
         ('lecturer', 'Lecturer'),
         ('coordinator', 'Coordinator'),
     )
+    # Establishes a one-to-one link with Django's User model
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     full_name = models.CharField(max_length=255, blank=True, verbose_name="Full Name")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
 
     def __str__(self):
-        return self.user.username
+        # Display the user's full name if available, otherwise their username
+        return self.user.get_full_name() or self.user.username
 
+# --- Signal Functions ---
+# These functions ensure that a Profile is automatically created and saved
+# whenever a new User is created.
 @receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
+def create_or_update_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
+    # In Django versions > 3.0, saving the profile on user save is handled automatically.
+    # This line can be kept for compatibility or removed if not needed.
+    # instance.profile.save()
 
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    instance.profile.save()
-
+# --- FYPProject Model ---
+# All foreign keys now filter roles through the 'profile' relationship.
 class FYPProject(models.Model):
     student = models.OneToOneField(User, on_delete=models.CASCADE, limit_choices_to={'profile__role': 'student'})
     student_matric_id = models.CharField(max_length=50, blank=True, verbose_name="Student ID")
@@ -75,10 +42,11 @@ class FYPProject(models.Model):
     supervisor = models.ForeignKey(User, related_name='supervised_projects', on_delete=models.SET_NULL, null=True, limit_choices_to={'profile__role': 'lecturer'})
     co_supervisor = models.ForeignKey(User, related_name='cosupervised_projects', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'profile__role': 'lecturer'})
     examiner = models.ForeignKey(User, related_name='examined_projects', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'profile__role': 'lecturer'})
-   
+    
     def __str__(self):
         return self.title
 
+# --- TimetableBooking Model ---
 class TimetableBooking(models.Model):
     lecturer = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'profile__role': 'lecturer'})
     start_time = models.DateTimeField()
@@ -91,6 +59,7 @@ class TimetableBooking(models.Model):
             return f"Booking for '{self.project.title}' by {self.lecturer.username}"
         return f"Availability for {self.lecturer.username}"
   
+# --- TimetableSlot Model ---
 class TimetableSlot(models.Model):
     project = models.ForeignKey(FYPProject, on_delete=models.CASCADE)
     start_time = models.DateTimeField()
