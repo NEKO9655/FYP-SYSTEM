@@ -5,19 +5,15 @@ from .models import Profile, FYPProject, TimetableBooking, TimetableSlot
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source='profile.full_name', read_only=True)
     role = serializers.CharField(source='profile.role', read_only=True)
-
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'full_name', 'email', 'role']
-
-class UserSerializer(serializers.ModelSerializer):
-    color = serializers.SerializerMethodField()
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'full_name', 'color', ...]
     
+    color = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'full_name', 'email', 'role', 'color']
+
     def get_color(self, obj):
-        colors = ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF']
+        colors = ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF']
         return colors[obj.id % len(colors)]
 
 class FYPProjectSerializer(serializers.ModelSerializer):
