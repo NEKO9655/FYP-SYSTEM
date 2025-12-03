@@ -12,26 +12,16 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 class FYPProjectViewSet(viewsets.ModelViewSet):
-    queryset = FYPProject.objects.all()
+    queryset = FYPProject.objects.all().order_by('student_matric_id')
     serializer_class = FYPProjectSerializer
-    
-    ordering = ['student_matric_id']
-    ordering_fields = ['student_matric_id', 'title']
-
 
 class TimetableBookingViewSet(viewsets.ModelViewSet):
-    queryset = TimetableBooking.objects.all()
+    queryset = TimetableBooking.objects.all().order_by('start_time')
     serializer_class = TimetableBookingSerializer
-    ordering = ['start_time']
-    ordering_fields = ['start_time']
-
 
 class TimetableSlotViewSet(viewsets.ModelViewSet):
-    queryset = TimetableSlot.objects.all()
+    queryset = TimetableSlot.objects.all().order_by('start_time')
     serializer_class = TimetableSlotSerializer
-    
-    ordering = ['start_time']
-    ordering_fields = ['start_time']
 
 def send_initial_notification(request):
     lecturers = User.objects.filter(profile__role='lecturer', is_active=True)
