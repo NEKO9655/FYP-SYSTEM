@@ -10,6 +10,16 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'full_name', 'email', 'role']
 
+class UserSerializer(serializers.ModelSerializer):
+    color = serializers.SerializerMethodField()
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'full_name', 'color', ...]
+    
+    def get_color(self, obj):
+        colors = ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF']
+        return colors[obj.id % len(colors)]
+
 class FYPProjectSerializer(serializers.ModelSerializer):
     student = UserSerializer(read_only=True)
     supervisor = UserSerializer(read_only=True)
