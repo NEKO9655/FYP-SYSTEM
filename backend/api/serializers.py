@@ -1,11 +1,17 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Profile, FYPProject, TimetableBooking, TimetableSlot
+from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot
 
+# --- NEW: CourseSerializer ---
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = ['id', 'name', 'code']
+
+# --- UserSerializer remains the same ---
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source='profile.full_name', read_only=True)
     role = serializers.CharField(source='profile.role', read_only=True)
-    
     color = serializers.SerializerMethodField()
 
     class Meta:
@@ -16,22 +22,23 @@ class UserSerializer(serializers.ModelSerializer):
         colors = ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF']
         return colors[obj.id % len(colors)]
 
+# --- FYPProjectSerializer now includes the course ---
 class FYPProjectSerializer(serializers.ModelSerializer):
     student = UserSerializer(read_only=True)
     supervisor = UserSerializer(read_only=True)
     co_supervisor = UserSerializer(read_only=True)
     examiner = UserSerializer(read_only=True)
+    course = CourseSerializer(read_only=True) # Nested serializer for course details
 
     class Meta:
         model = FYPProject
-        fields = ['id', 'title', 'student', 'student_matric_id', 'supervisor', 'co_supervisor', 'examiner']
+        fields = ['id', 'title', 'student', 'student_matric_id', 'supervisor', 'co_supervisor', 'examiner', 'course']
 
-
+# --- Other serializers remain the same ---
 class TimetableBookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimetableBooking
         fields = ['id', 'lecturer', 'start_time', 'end_time', 'project', 'examiner']
-
 
 class TimetableSlotSerializer(serializers.ModelSerializer):
     project = FYPProjectSerializer(read_only=True)
