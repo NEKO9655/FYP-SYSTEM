@@ -1,11 +1,13 @@
-# --- File: backend/api/models.py (FINAL & COMPLETE) ---
+# --- File: backend/api/models.py (FINAL CLEANED VERSION) ---
 
 from django.db import models
-from django.contrib.auth.models import User
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+from django.contrib.auth.models import User # Use Django's built-in User model
 
-# --- 1. NEW: Course Model ---
+# --- 1. REMOVED signal-related imports ---
+# from django.db.models.signals import post_save
+# from django.dispatch import receiver
+
+# --- Course Model (remains unchanged) ---
 class Course(models.Model):
     name = models.CharField(max_length=100, unique=True)
     code = models.CharField(max_length=10, unique=True)
@@ -13,7 +15,7 @@ class Course(models.Model):
     def __str__(self):
         return self.name
 
-# --- 2. UPDATED: Profile Model ---
+# --- Profile Model (remains unchanged) ---
 class Profile(models.Model):
     ROLE_CHOICES = (
         ('student', 'Student'),
@@ -26,14 +28,14 @@ class Profile(models.Model):
     course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
+        # Using user.username is more reliable here as full_name might be blank initially.
+        # The admin panel will handle displaying the full name.
         return self.user.username
 
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        Profile.objects.create(user=instance)
+# --- 2. REMOVED the @receiver signal function completely ---
+# The ProfileInline in admin.py now handles the creation of the Profile.
 
-# --- 3. UPDATED: FYPProject Model ---
+# --- FYPProject Model (remains unchanged) ---
 class FYPProject(models.Model):
     student = models.OneToOneField(User, on_delete=models.CASCADE, limit_choices_to={'profile__role': 'student'})
     student_matric_id = models.CharField(max_length=50, blank=True, verbose_name="Student ID")
@@ -46,7 +48,7 @@ class FYPProject(models.Model):
     def __str__(self):
         return self.title
 
-# --- Other models remain unchanged ---
+# --- TimetableBooking Model (remains unchanged) ---
 class TimetableBooking(models.Model):
     lecturer = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'profile__role': 'lecturer'})
     start_time = models.DateTimeField()
@@ -59,6 +61,7 @@ class TimetableBooking(models.Model):
             return f"Booking for '{self.project.title}' by {self.lecturer.username}"
         return f"Availability for {self.lecturer.username}"
   
+# --- TimetableSlot Model (remains unchanged) ---
 class TimetableSlot(models.Model):
     project = models.ForeignKey(FYPProject, on_delete=models.CASCADE)
     start_time = models.DateTimeField()
