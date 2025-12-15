@@ -13,15 +13,20 @@ class CourseViewSet(viewsets.ModelViewSet):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.filter(is_active=True)
     serializer_class = UserSerializer
+    # Enable filtering by the 'role' field
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['profile__role'] # Filter through the related profile model
 
 class FYPProjectViewSet(viewsets.ModelViewSet):
     queryset = FYPProject.objects.all().order_by('student_matric_id')
     serializer_class = FYPProjectSerializer
+    
+    # Enable filtering capabilities
     filter_backends = [DjangoFilterBackend]
-    # --- Add 'fyp_stage' to the filterset_fields ---
+    # --- The CORE FIX is here ---
+    # Ensure 'supervisor' is included in the list of filterable fields.
     filterset_fields = ['course', 'fyp_stage', 'supervisor']
 
-# --- Other ViewSets remain the same ---
 class TimetableBookingViewSet(viewsets.ModelViewSet):
     queryset = TimetableBooking.objects.all().order_by('start_time')
     serializer_class = TimetableBookingSerializer
