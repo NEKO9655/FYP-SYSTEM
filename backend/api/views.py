@@ -53,6 +53,7 @@ def export_to_google_sheet(request):
             "https://www.googleapis.com/auth/drive"
         ]
         
+        # --- CORE FIX for 500 Internal Server Error ---
         # Build a robust path to the credentials file
         keyfile_path = os.path.join(settings.BASE_DIR, 'backend', 'client_secret.json')
         
