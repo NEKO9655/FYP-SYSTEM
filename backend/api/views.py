@@ -94,3 +94,28 @@ def export_to_google_sheet(request):
         return Response({'status': 'error', 'message': f"An unexpected error occurred: {str(e)}"}, status=500)
 
 # ... (send_initial_notification function remains the same) ...
+@api_view(['POST'])
+def send_initial_notification(request):
+    """
+    API view to send a notification email to all active lecturers.
+    """
+    try:
+        lecturers = User.objects.filter(profile__role='lecturer', is_active=True)
+        recipient_list = [lecturer.email for lecturer in lecturers if lecturer.email]
+
+        if recipient_list:
+            send_mail(
+                subject='Reminder: Please Submit Your FYP Availability',
+                message='Dear Lecturers,\n\nPlease log in to the FYPHub to submit your available time slots for the upcoming presentations.\n\nThank you.',
+                from_email='your-fyp-system-email@uts.edu.my',
+                recipient_list=recipient_list,
+                fail_silently=False,
+            )
+            success_message = f"Successfully sent notifications to {len(recipient_list)} lecturers."
+            return Response({'status': 'success', 'message': success_message})
+        else:
+            no_recipients_message = "No lecturers with valid email addresses found."
+            return Response({'status': 'success', 'message': no_recipients_message})
+    except Exception as e:
+        error_message = f"An error occurred: {str(e)}"
+        return Response({'status': 'error', 'message': error_message}, status=500)
