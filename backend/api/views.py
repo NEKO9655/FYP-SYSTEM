@@ -19,7 +19,7 @@ class FYPProjectViewSet(viewsets.ModelViewSet):
     serializer_class = FYPProjectSerializer
     filter_backends = [DjangoFilterBackend]
     # --- Add 'fyp_stage' to the filterset_fields ---
-    filterset_fields = ['course', 'fyp_stage']
+    filterset_fields = ['course', 'fyp_stage', 'supervisor']
 
 # --- Other ViewSets remain the same ---
 class TimetableBookingViewSet(viewsets.ModelViewSet):
