@@ -1,9 +1,9 @@
-# --- File: backend/api/urls.py (FINAL & COMPLETE) ---
+# --- File: backend/api/urls.py (FINAL FIXED VERSION) ---
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-# Import all ViewSets and custom function-based views
+# Import all your views
 from .views import (
     CourseViewSet,
     UserViewSet,
@@ -14,13 +14,21 @@ from .views import (
     send_initial_notification
 )
 
-# Router for ViewSets
+# Initialize the router
 router = DefaultRouter()
+
+# Register all ViewSet-based routes
 router.register(r'courses', CourseViewSet)
 router.register(r'users', UserViewSet)
 router.register(r'projects', FYPProjectViewSet)
 router.register(r'bookings', TimetableBookingViewSet)
-router.register(r'slots', TimetableSlotViewSet)
+
+# --- THE CORE FIX IS HERE ---
+# Because TimetableSlotViewSet uses a dynamic get_queryset() method instead of a
+# static 'queryset' attribute, we must explicitly provide a 'basename' for the router.
+# The basename is used to generate the URL names (e.g., 'timetableslot-list').
+router.register(r'slots', TimetableSlotViewSet, basename='timetableslot')
+
 
 # Define all URL patterns for the 'api' app
 urlpatterns = [
