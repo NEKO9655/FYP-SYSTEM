@@ -15,7 +15,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Old data deleted."))
 
         # --- 读取Excel文件 ---
-        file_path = 'students_data.xlsx'
+        file_path = './students_data.xlsx'
         try:
             df = pd.read_excel(file_path)
             # 将NaN值替换为空字符串，防止错误
