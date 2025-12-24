@@ -1,4 +1,4 @@
-# --- File: backend/backend/settings.py (FINAL & COMPLETE) ---
+# --- File: backend/backend/settings.py (FINAL FIXED VERSION) ---
 
 from pathlib import Path
 
@@ -71,24 +71,30 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# --- REST_FRAMEWORK settings (remains unchanged) ---
+# --- Django REST Framework Configuration ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
     ],
+    # --- THE CORE FIX IS HERE ---
+    # Change the default permission to 'IsAuthenticatedOrReadOnly'.
+    # This allows anyone to perform safe, read-only actions (like GET),
+    # but requires a user to be logged in for any unsafe, write actions (POST, PUT, DELETE).
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ]
 }
 
+# --- CORS (Cross-Origin Resource Sharing) Configuration ---
 CORS_ALLOW_ALL_ORIGINS = True
-
 CORS_ALLOW_CREDENTIALS = True
 
+# --- CSRF Trusted Origins Configuration ---
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
 ]
 
+# --- Email Configuration ---
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
