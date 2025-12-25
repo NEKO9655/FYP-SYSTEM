@@ -1,6 +1,7 @@
-# --- File: backend/backend/settings.py (FINAL FIXED VERSION) ---
+# --- File: backend/backend/settings.py (FINAL & EXPLICIT VERSION) ---
 
 from pathlib import Path
+import os # Import os module
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -39,10 +40,12 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        # --- ADD a DIRS path to ensure CSRF template tag can be found ---
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -53,48 +56,56 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+DATABASES = { 'default': { 'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3' } }
 
 AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I1N = True
+TIME_ZONE = 'Asia/Kuala_Lumpur' # Changed to a specific timezone
+USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# --- Django REST Framework Configuration ---
+# --- 【THE FINAL FIX IS HERE】 ---
+# We are making the authentication and permission settings extremely explicit.
+
+# 1. Explicitly define Django's authentication backends.
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# 2. Configure Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        # Explicitly state that we are using SessionAuthentication.
         'rest_framework.authentication.SessionAuthentication',
     ],
-    # --- THE CORE FIX IS HERE ---
-    # Change the default permission to 'IsAuthenticatedOrReadOnly'.
-    # This allows anyone to perform safe, read-only actions (like GET),
-    # but requires a user to be logged in for any unsafe, write actions (POST, PUT, DELETE).
     'DEFAULT_PERMISSION_CLASSES': [
+        # Use IsAuthenticatedOrReadOnly to allow initial GET requests.
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-    ]
+    ],
+    # (Optional but good practice) Ensure Django's CSRF is handled correctly
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
 }
 
-# --- CORS (Cross-Origin Resource Sharing) Configuration ---
+# 3. CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
-# --- CSRF Trusted Origins Configuration ---
+# 4. CSRF Trusted Origins Configuration
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
 ]
+# --- 【END OF FIX】 ---
 
-# --- Email Configuration ---
+# Email Configuration
+# ... (your email settings)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
