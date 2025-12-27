@@ -1,7 +1,5 @@
-# --- File: backend/api/views.py (FINAL & COMPLETE - WITH CSRF FIX) ---
-
 from rest_framework import viewsets
-from rest_framework.decorators import api_view, ensure_csrf_cookie # Import ensure_csrf_cookie
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
@@ -11,6 +9,11 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 from django.conf import settings
+
+# --- THE FIX IS HERE ---
+# ensure_csrf_cookie comes from Django's csrf decorators, not DRF's.
+from django.views.decorators.csrf import ensure_csrf_cookie
+# --- END OF FIX ---
 
 from .models import Course, FYPProject, TimetableBooking, TimetableSlot
 from .serializers import CourseSerializer, UserSerializer, FYPProjectSerializer, TimetableBookingSerializer, TimetableSlotSerializer
