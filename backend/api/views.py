@@ -1,7 +1,7 @@
-# --- File: backend/api/views.py (FINAL INTEGRATED & ROBUST VERSION) ---
+# --- File: backend/api/views.py (FINAL & COMPLETE - WITH CSRF FIX) ---
 
 from rest_framework import viewsets
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, ensure_csrf_cookie # Import ensure_csrf_cookie
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
@@ -15,7 +15,12 @@ from django.conf import settings
 from .models import Course, FYPProject, TimetableBooking, TimetableSlot
 from .serializers import CourseSerializer, UserSerializer, FYPProjectSerializer, TimetableBookingSerializer, TimetableSlotSerializer
 
-# --- ViewSets ---
+# --- NEW: A simple view just to set the CSRF cookie ---
+@api_view(['GET'])
+@ensure_csrf_cookie
+def get_csrf_token(request):
+    return Response({"message": "CSRF cookie set."})
+
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
@@ -38,20 +43,14 @@ class TimetableBookingViewSet(viewsets.ModelViewSet):
 
 class TimetableSlotViewSet(viewsets.ModelViewSet):
     serializer_class = TimetableSlotSerializer
-
     def get_queryset(self):
         user = self.request.user
-        
         if user.is_staff:
             return TimetableSlot.objects.all().order_by('start_time')
-        
         if hasattr(user, 'profile') and user.profile.role == 'lecturer':
             return TimetableSlot.objects.filter(
-                Q(project__supervisor=user) | 
-                Q(project__examiner=user) | 
-                Q(project__co_supervisor=user)
+                Q(project__supervisor=user) | Q(project__examiner=user) | Q(project__co_supervisor=user)
             ).distinct().order_by('start_time')
-        
         return TimetableSlot.objects.none()
 
 @api_view(['POST'])
