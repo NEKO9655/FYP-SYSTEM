@@ -1,7 +1,5 @@
-# --- File: backend/backend/settings.py (FINAL & EXPLICIT VERSION) ---
-
 from pathlib import Path
-import os # Import os module
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -9,7 +7,8 @@ SECRET_KEY = 'django-insecure-70y$)ul++yjd-)d)iiww3n%_+1qamqs_nu7zfg%ism_#a^o^4+
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# 允许本地开发访问
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -20,14 +19,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'api',
     'rest_framework',
-    'corsheaders',
+    'corsheaders',  # 必须在 rest_framework 之前
     'django_filters',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # 必须放在 CommonMiddleware 之前
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -40,8 +39,7 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # --- ADD a DIRS path to ensure CSRF template tag can be found ---
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -56,69 +54,70 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-DATABASES = { 'default': { 'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3' } }
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
 
-AUTH_PASSWORD_VALIDATORS = []
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
+]
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Asia/Kuala_Lumpur' # Changed to a specific timezone
-USE_I1N = True
+TIME_ZONE = 'UTC'
+USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# --- 【THE FINAL FIX IS HERE】 ---
-# We are making the authentication and permission settings extremely explicit.
+# ==============================================================================
+# 认证与跨域核心配置 (核心修复部分)
+# ==============================================================================
 
-# 1. Explicitly define Django's authentication backends.
-AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
-]
-
-# 2. Configure Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # Explicitly state that we are using SessionAuthentication.
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        # Use IsAuthenticatedOrReadOnly to allow initial GET requests.
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-    ],
-    # (Optional but good practice) Ensure Django's CSRF is handled correctly
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
     ],
 }
 
-# Email Configuration
-# ... (your email settings)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your-email@gmail.com'
-EMAIL_HOST_PASSWORD = 'your-app-password'
-
-# backend/settings.py
-
-# 允许跨域请求携带 Cookie
-CORS_ALLOW_CREDENTIALS = True
+# 1. 跨域 (CORS) 设置
+CORS_ALLOW_CREDENTIALS = True  # 允许跨域携带 Cookie
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
 
-# 4. CSRF Trusted Origins Configuration
+# 2. CSRF 信任源设置 (Django 4.0+ 必须配置)
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
-# --- 【END OF FIX】 ---
-# 核心：允许开发环境下的跨端口 Cookie 传输
-CSRF_COOKIE_SAMESITE = 'Lax'
+# 3. Cookie 策略 (解决无法登录的关键)
+CSRF_COOKIE_HTTPONLY = False   # 允许前端 JS 读取 CSRF Token
+CSRF_COOKIE_SAMESITE = 'Lax'   # 允许跨端口传输 Cookie
 SESSION_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_HTTPONLY = False  # 允许前端脚本读取 Cookie
+
+# 4. 认证后端
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# ==============================================================================
+# 邮件配置
+# ==============================================================================
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'your-email@gmail.com' # 记得替换
+EMAIL_HOST_PASSWORD = 'your-app-password' # 记得替换
