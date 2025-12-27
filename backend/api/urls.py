@@ -2,6 +2,7 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from .views import set_csrf_token
 
 from .views import (
     CourseViewSet,
@@ -27,7 +28,7 @@ urlpatterns = [
     # --- 2. Add the new path for our CSRF endpoint ---
     # This creates the endpoint: /api/get-csrf-token/
     path('get-csrf-token/', get_csrf_token, name='get-csrf-token'),
-    
+    path('set-csrf/', set_csrf_token, name='set-csrf-token'),
     path('export-to-sheet/', export_to_google_sheet, name='export-to-sheet'),
     path('send-notification/', send_initial_notification, name='send-notification'),
 ]
