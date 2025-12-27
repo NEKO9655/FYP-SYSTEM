@@ -1,6 +1,8 @@
 from rest_framework import viewsets
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny # Import AllowAny
 from rest_framework.response import Response
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
@@ -17,6 +19,13 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 
 from .models import Course, FYPProject, TimetableBooking, TimetableSlot
 from .serializers import CourseSerializer, UserSerializer, FYPProjectSerializer, TimetableBookingSerializer, TimetableSlotSerializer
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny]) # Explicitly allow anyone to access this
+@ensure_csrf_cookie
+def set_csrf_token(request):
+    return Response({"detail": "CSRF cookie set."})
 
 # --- NEW: A simple view just to set the CSRF cookie ---
 @api_view(['GET'])

@@ -94,18 +94,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-# 3. CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-]
-CORS_ALLOW_CREDENTIALS = True
-
-# 4. CSRF Trusted Origins Configuration
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-]
-# --- 【END OF FIX】 ---
-
 # Email Configuration
 # ... (your email settings)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -114,3 +102,23 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'your-email@gmail.com'
 EMAIL_HOST_PASSWORD = 'your-app-password'
+
+# backend/settings.py
+
+# 允许跨域请求携带 Cookie
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# 4. CSRF Trusted Origins Configuration
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+]
+
+# --- 【END OF FIX】 ---
+# 核心：允许开发环境下的跨端口 Cookie 传输
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False  # 允许前端脚本读取 Cookie
