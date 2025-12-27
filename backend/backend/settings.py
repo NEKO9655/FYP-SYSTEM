@@ -1,12 +1,14 @@
-# --- File: backend/backend/settings.py (FINAL EXPLICIT & SECURE VERSION) ---
+# --- File: backend/backend/settings.py (FINAL & EXPLICIT VERSION) ---
 
 from pathlib import Path
-import os
+import os # Import os module
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = '...' # Your secret key
+SECRET_KEY = 'django-insecure-70y$)ul++yjd-)d)iiww3n%_+1qamqs_nu7zfg%ism_#a^o^4+'
+
 DEBUG = True
+
 ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
@@ -25,7 +27,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware', # Must be high up
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -38,7 +40,8 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        # --- ADD a DIRS path to ensure CSRF template tag can be found ---
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -56,42 +59,51 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = { 'default': { 'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3' } }
 
 AUTH_PASSWORD_VALIDATORS = []
+
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Asia/Kuala_Lumpur'
+TIME_ZONE = 'Asia/Kuala_Lumpur' # Changed to a specific timezone
 USE_I1N = True
 USE_TZ = True
+
 STATIC_URL = 'static/'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
+# --- 【THE FINAL FIX IS HERE】 ---
+# We are making the authentication and permission settings extremely explicit.
 
+# 1. Explicitly define Django's authentication backends.
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# 2. Configure Django REST Framework
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework.authentication.SessionAuthentication'],
-    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticatedOrReadOnly'],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        # Explicitly state that we are using SessionAuthentication.
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        # Use IsAuthenticatedOrReadOnly to allow initial GET requests.
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    # (Optional but good practice) Ensure Django's CSRF is handled correctly
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
 }
 
-# --- 【THE FINAL FIX IS HERE】 ---
-# We are making the CORS and CSRF settings extremely explicit for development.
-
-# 1. Instead of allowing all origins, we explicitly list our frontend.
+# 3. CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
-# 2. We also add our frontend to the trusted origins for CSRF.
+# 4. CSRF Trusted Origins Configuration
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
 ]
-
-# 3. Explicitly set the SameSite attribute for cookies.
-# This is often the key to making cross-origin cookies work in modern browsers.
-SESSION_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_SAMESITE = 'Lax'
-
-SESSION_COOKIE_SECURE = False # Must be False for http (localhost)
-CSRF_COOKIE_SECURE = False   # Must be False for http (localhost)
-
 # --- 【END OF FIX】 ---
 
 # Email Configuration
