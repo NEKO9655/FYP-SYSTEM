@@ -74,15 +74,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # --- REPLACE your existing REST_FRAMEWORK setting with this ---
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        # Use SessionAuthentication for simplicity, it works with the admin login.
-        'rest_framework.authentication.SessionAuthentication',
-    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        # By default, users must be logged in to access the API.
-        'rest_framework.permissions.IsAuthenticated',
-    ]
+        'rest_framework.permissions.AllowAny',
+    ],
 }
+
 # --- 【END OF CHANGE】 ---
 
 # We still need CORS settings to allow the frontend to connect

@@ -1,81 +1,90 @@
+# --- File: backend/api/management/commands/import_data.py (FINAL UPGRADED VERSION) ---
+
 import pandas as pd
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
-from api.models import Profile, Course, FYPProject
+# --- 1. Import TimetableSlot ---
+from api.models import Profile, Course, FYPProject, TimetableSlot
 
 class Command(BaseCommand):
-    help = 'Imports data from a specified Excel file into the database.'
+    help = 'Imports data from Excel files for users, projects, and timetable slots.'
 
     def handle(self, *args, **options):
-        # --- 清理旧数据 ---
+        # --- Clean up old data ---
         self.stdout.write("Deleting old data...")
+        TimetableSlot.objects.all().delete() # Also delete old slots
         FYPProject.objects.all().delete()
-        User.objects.filter(is_superuser=False).delete() # 删除所有非管理员用户
+        User.objects.filter(is_superuser=False).delete()
         Course.objects.all().delete()
         self.stdout.write(self.style.SUCCESS("Old data deleted."))
 
-        # --- 读取Excel文件 ---
-        file_path = './students_data.xlsx'
+        # --- PASS 1 & 2: Import Users and Projects (Your existing logic) ---
+        file_path = 'students_data.xlsx'
         try:
-            df = pd.read_excel(file_path)
-            # 将NaN值替换为空字符串，防止错误
-            df = df.fillna('') 
+            df = pd.read_excel(file_path).fillna('')
         except FileNotFoundError:
-            self.stderr.write(self.style.ERROR(f"'{file_path}' not found. Please place it in the 'backend' directory."))
+            self.stderr.write(self.style.ERROR(f"'{file_path}' not found."))
             return
 
-        self.stdout.write(f"Importing data from {file_path}...")
-
-        # --- 遍历Excel的每一行并创建数据 ---
+        self.stdout.write("Starting Pass 1: Creating Courses and Users...")
         for index, row in df.iterrows():
-            # 1. 创建或获取 Course
-            course_code = row.get('course_code')
             course = None
-            if course_code:
-                course, _ = Course.objects.get_or_create(code=course_code, defaults={'name': f"Course {course_code}"})
-
-            # 2. 创建或获取 User 和 Profile
+            if row.get('course_code'):
+                course, _ = Course.objects.get_or_create(code=row.get('course_code'), defaults={'name': f"Course {row.get('course_code')}"})
             username = row.get('username')
-            if not username:
-                continue # 如果没有用户名，跳过这一行
-
-            user, created = User.objects.get_or_create(username=username)
-            if created:
-                # 为新用户设置一个默认密码，比如 'password123'
-                user.set_password('password123')
+            if username:
+                user, created = User.objects.get_or_create(username=username)
+                if created: user.set_password('password123'); user.save()
+                user.email = row.get('email', '')
                 user.save()
-            
-            # 更新或创建 Profile
-            Profile.objects.update_or_create(
-                user=user,
-                defaults={
-                    'full_name': row.get('full_name', ''),
-                    'role': row.get('role', 'student'),
-                    'course': course,
-                }
-            )
-            # Django 会自动更新User对象的 email, first_name, last_name (如果它们在 Excel 中)
-            user.email = row.get('email', '')
-            user.save()
+                Profile.objects.update_or_create(user=user, defaults={'full_name': row.get('full_name', ''), 'role': row.get('role', 'student'), 'course': course})
+        self.stdout.write(self.style.SUCCESS("Pass 1 completed."))
 
-            # 3. 如果是学生，创建 FYPProject
+        self.stdout.write("Starting Pass 2: Creating and linking FYP Projects...")
+        for index, row in df.iterrows():
             if row.get('role') == 'student' and row.get('title'):
-                # 查找导师、副导师和评审员用户
-                supervisor = User.objects.filter(username=row.get('supervisor_username')).first()
-                co_supervisor = User.objects.filter(username=row.get('co_supervisor_username')).first()
-                examiner = User.objects.filter(username=row.get('examiner_username')).first()
+                try:
+                    student_user = User.objects.get(username=row.get('username'))
+                    supervisor = User.objects.filter(username=row.get('supervisor_username')).first()
+                    co_supervisor = User.objects.filter(username=row.get('co_supervisor_username')).first()
+                    examiner = User.objects.filter(username=row.get('examiner_username')).first()
+                    course = Course.objects.filter(code=row.get('course_code')).first()
+                    FYPProject.objects.create(student=student_user, student_matric_id=row.get('student_matric_id', ''), title=row.get('title', 'No Title'), fyp_stage=row.get('fyp_stage', 'FYP1'), course=course, supervisor=supervisor, co_supervisor=co_supervisor, examiner=examiner)
+                except User.DoesNotExist:
+                    self.stderr.write(self.style.WARNING(f"Skipping project for non-existent user: {row.get('username')}"))
+        self.stdout.write(self.style.SUCCESS("Pass 2 completed."))
 
-                FYPProject.objects.update_or_create(
-                    student=user,
-                    defaults={
-                        'student_matric_id': row.get('student_matric_id', ''),
-                        'title': row.get('title', 'No Title'),
-                        'fyp_stage': row.get('fyp_stage', 'FYP1'),
-                        'course': course,
-                        'supervisor': supervisor,
-                        'co_supervisor': co_supervisor,
-                        'examiner': examiner,
-                    }
+
+        # --- 2. 【NEW】PASS 3: Import Timetable Slots ---
+        self.stdout.write("Starting Pass 3: Importing Timetable Slots...")
+        slots_file_path = 'slots_data.xlsx'
+        try:
+            slots_df = pd.read_excel(slots_file_path).fillna('')
+
+            for index, row in slots_df.iterrows():
+                # Find the project by its title
+                project = FYPProject.objects.filter(title=row.get('project_title')).first()
+                if not project:
+                    self.stderr.write(self.style.WARNING(f"Skipping slot for non-existent project: '{row.get('project_title')}'"))
+                    continue
+
+                # Create the TimetableSlot instance
+                slot = TimetableSlot.objects.create(
+                    project=project,
+                    start_time=row.get('start_time'),
+                    end_time=row.get('end_time'),
+                    venue=row.get('venue', '')
                 )
+
+                # Handle multiple examiners (ManyToMany field)
+                examiner_names_str = str(row.get('examiner_usernames', ''))
+                examiner_names = [name.strip() for name in examiner_names_str.split(',') if name.strip()]
+                if examiner_names:
+                    examiners = User.objects.filter(username__in=examiner_names)
+                    slot.examiners.set(examiners) # Use .set() for ManyToMany fields
         
-        self.stdout.write(self.style.SUCCESS("Data import completed successfully!"))
+        except FileNotFoundError:
+            # This is not an error, just a notice if the file doesn't exist.
+            self.stdout.write(self.style.NOTICE(f"'{slots_file_path}' not found, skipping slot import."))
+        
+        self.stdout.write(self.style.SUCCESS("Pass 3 completed. Data import finished!"))
