@@ -66,8 +66,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework.authentication.SessionAuthentication'],
-    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticatedOrReadOnly'],
+    # 'DEFAULT_AUTHENTICATION_CLASSES': [ ... ], # Temporarily comment this out
+    'DEFAULT_PERMISSION_CLASSES': [
+        # --- Temporarily allow anyone to access the API for development ---
+        'rest_framework.permissions.AllowAny',
+    ],
 }
 
 # --- 【THE FINAL FIX IS HERE】 ---
