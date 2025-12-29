@@ -4,6 +4,7 @@ import pandas as pd
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from api.models import Profile, Course, FYPProject, TimetableSlot
+from django.utils import timezone
 
 class Command(BaseCommand):
     help = 'Imports data from Excel files for users, projects, and slots.'
@@ -93,6 +94,7 @@ class Command(BaseCommand):
         slots_file_path = 'slots_data.xlsx'
         try:
             slots_df = pd.read_excel(slots_file_path).fillna('')
+
             for index, row in slots_df.iterrows():
                 project_title_to_find = str(row.get('project_title', '')).strip()
                 project = FYPProject.objects.filter(title=project_title_to_find).first()
@@ -100,11 +102,18 @@ class Command(BaseCommand):
                 if not project:
                     self.stderr.write(self.style.WARNING(f"Pass 3 Warning: Skipping slot for non-existent project: '{project_title_to_find}'"))
                     continue
+                
+                naive_start_time = row.get('start_time')
+                naive_end_time = row.get('end_time')
+
+                if pd.notna(naive_start_time) and pd.notna(naive_end_time):
+                    aware_start_time = timezone.make_aware(naive_start_time)
+                    aware_end_time = timezone.make_aware(naive_end_time)
 
                 slot = TimetableSlot.objects.create(
                     project=project,
-                    start_time=row.get('start_time'),
-                    end_time=row.get('end_time'),
+                    start_time=aware_start_time,
+                    end_time=aware_end_time,
                     venue=str(row.get('venue', '')).strip()
                 )
 
@@ -113,8 +122,10 @@ class Command(BaseCommand):
                 if examiner_names:
                     examiners = User.objects.filter(username__in=examiner_names)
                     slot.examiners.set(examiners)
+            else:
+                self.stderr.write(self.style.WARNING(f"Pass 3 Warning: Skipping slot for project '{project_title_to_find}' due to invalid time format."))
         
         except FileNotFoundError:
-            self.stdout.write(self.style.NOTICE(f"'{slots_file_path}' not found, skipping Pass 3."))
+            self.stdout.write(self.style.NOTICE(f"'{slots_file_path}' not found, skipping slot import."))
         
         self.stdout.write(self.style.SUCCESS("Data import finished!"))
