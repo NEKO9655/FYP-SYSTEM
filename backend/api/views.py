@@ -1,8 +1,8 @@
+# --- File: backend/api/views.py (FINAL INTEGRATED & ROBUST VERSION) ---
+
 from rest_framework import viewsets
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny # Import AllowAny
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
@@ -12,27 +12,10 @@ from oauth2client.service_account import ServiceAccountCredentials
 import os
 from django.conf import settings
 
-# --- THE FIX IS HERE ---
-# ensure_csrf_cookie comes from Django's csrf decorators, not DRF's.
-from django.views.decorators.csrf import ensure_csrf_cookie
-# --- END OF FIX ---
-
 from .models import Course, FYPProject, TimetableBooking, TimetableSlot
 from .serializers import CourseSerializer, UserSerializer, FYPProjectSerializer, TimetableBookingSerializer, TimetableSlotSerializer
 
-
-@api_view(['GET'])
-@permission_classes([AllowAny]) # Explicitly allow anyone to access this
-@ensure_csrf_cookie
-def set_csrf_token(request):
-    return Response({"detail": "CSRF cookie set."})
-
-# --- NEW: A simple view just to set the CSRF cookie ---
-@api_view(['GET'])
-@ensure_csrf_cookie
-def get_csrf_token(request):
-    return Response({"message": "CSRF cookie set."})
-
+# --- ViewSets ---
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
@@ -53,21 +36,40 @@ class TimetableBookingViewSet(viewsets.ModelViewSet):
     queryset = TimetableBooking.objects.all().order_by('start_time')
     serializer_class = TimetableBookingSerializer
 
+# --- UPDATED: TimetableSlotViewSet with dynamic filtering logic ---
 class TimetableSlotViewSet(viewsets.ModelViewSet):
     serializer_class = TimetableSlotSerializer
+
     def get_queryset(self):
+        """
+        Dynamically filters the queryset based on the user's role.
+        - Coordinators/Staff get all slots.
+        - Lecturers get only slots where they are a supervisor, co-supervisor, or examiner.
+        """
         user = self.request.user
+        
+        # If the user is staff (like a coordinator), return all timetable slots
         if user.is_staff:
             return TimetableSlot.objects.all().order_by('start_time')
+        
+        # If the user is a lecturer, filter for their relevant slots
         if hasattr(user, 'profile') and user.profile.role == 'lecturer':
+            # Use Q objects to find slots where the user is involved in any capacity
             return TimetableSlot.objects.filter(
-                Q(project__supervisor=user) | Q(project__examiner=user) | Q(project__co_supervisor=user)
+                Q(project__supervisor=user) | 
+                Q(project__examiner=user) | 
+                Q(project__co_supervisor=user)
             ).distinct().order_by('start_time')
+        
+        # For any other role (like students), return an empty list for this endpoint
         return TimetableSlot.objects.none()
 
+# --- Custom Function-Based API Views ---
+
+# --- UPDATED: export_to_google_sheet with course filtering logic ---
 @api_view(['POST'])
 def export_to_google_sheet(request):
-    user = request.user
+    user = request.user # Get the currently logged-in user
 
     try:
         scope = [
@@ -102,7 +104,7 @@ def export_to_google_sheet(request):
                 f"{slot.start_time.strftime('%I:%M %p')} - {slot.end_time.strftime('%I:%M %p')}",
                 slot.venue, student_name,
                 slot.project.title if slot.project else 'N/A',
-                'Supervisor' # Role logic needs enhancement
+                'Supervisor' # Role logic needs enhancement in the future
             ]
             data_to_write.append(row)
         
@@ -119,12 +121,8 @@ def export_to_google_sheet(request):
     except Exception as e:
         return Response({'status': 'error', 'message': f"An unexpected error occurred: {str(e)}"}, status=500)
 
-# --- UPDATED: send_initial_notification with better error handling ---
 @api_view(['POST'])
 def send_initial_notification(request):
-    """
-    API view to send a notification email to all active lecturers.
-    """
     try:
         lecturers = User.objects.filter(profile__role='lecturer', is_active=True)
         recipient_list = [lecturer.email for lecturer in lecturers if lecturer.email]
@@ -143,5 +141,5 @@ def send_initial_notification(request):
             no_recipients_message = "No lecturers with valid email addresses found."
             return Response({'status': 'success', 'message': no_recipients_message})
     except Exception as e:
-        error_message = f"An error occurred while sending emails: {str(e)}"
+        error_message = f"An error occurred: {str(e)}"
         return Response({'status': 'error', 'message': error_message}, status=500)
