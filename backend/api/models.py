@@ -44,6 +44,7 @@ class TimetableBooking(models.Model):
     end_time = models.DateTimeField()
     project = models.ForeignKey(FYPProject, on_delete=models.SET_NULL, null=True, blank=True)
     examiner = models.ForeignKey(User, related_name='booking_examiner', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'profile__role': 'lecturer'})
+    venue = models.CharField(max_length=100, blank=True)
     def __str__(self):
         if self.project: return f"Booking for '{self.project.title}' by {self.lecturer.username}"
         return f"Availability for {self.lecturer.username}"
