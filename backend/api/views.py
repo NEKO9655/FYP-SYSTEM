@@ -41,11 +41,6 @@ class TimetableSlotViewSet(viewsets.ModelViewSet):
     serializer_class = TimetableSlotSerializer
 
     def get_queryset(self):
-        """
-        Dynamically filters the queryset based on the user's role.
-        - Coordinators/Staff get all slots.
-        - Lecturers get only slots where they are a supervisor, co-supervisor, or examiner.
-        """
         user = self.request.user
         
         # If the user is staff (like a coordinator), return all timetable slots
