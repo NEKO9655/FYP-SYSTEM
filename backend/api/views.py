@@ -34,31 +34,13 @@ class TimetableBookingViewSet(viewsets.ModelViewSet):
     queryset = TimetableBooking.objects.all().order_by('start_time')
     serializer_class = TimetableBookingSerializer
 
-# --- 【THE CORE FIX IS HERE】 ---
-# This is the final, correct version of the TimetableSlotViewSet.
 class TimetableSlotViewSet(viewsets.ModelViewSet):
+    queryset = TimetableSlot.objects.all().order_by('start_time')
+    
     serializer_class = TimetableSlotSerializer
-    # We add filtering capabilities here as well.
+    
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['project__course']
-
-    def get_queryset(self):
-        user = self.request.user
-        
-        # If the user is staff (like a coordinator), return all timetable slots
-        if user.is_staff:
-            return TimetableSlot.objects.all().order_by('start_time')
-        
-        # If the user is a lecturer, filter for their relevant slots
-        if hasattr(user, 'profile') and user.profile.role == 'lecturer':
-            return TimetableSlot.objects.filter(
-                Q(project__supervisor=user) | 
-                Q(project__examiner=user) | 
-                Q(project__co_supervisor=user)
-            ).distinct().order_by('start_time')
-        
-        # For any other role (like students), return an empty list for this endpoint
-        return TimetableSlot.objects.none()
 
 @api_view(['POST'])
 def export_to_google_sheet(request):
