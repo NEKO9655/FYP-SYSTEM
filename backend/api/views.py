@@ -38,30 +38,10 @@ class TimetableBookingViewSet(viewsets.ModelViewSet):
 
 # --- UPDATED: TimetableSlotViewSet with dynamic filtering logic ---
 class TimetableSlotViewSet(viewsets.ModelViewSet):
+    queryset = TimetableSlot.objects.all().order_by('start_time')
+    
     serializer_class = TimetableSlotSerializer
 
-    def get_queryset(self):
-        user = self.request.user
-        
-        # If the user is staff (like a coordinator), return all timetable slots
-        if user.is_staff:
-            return TimetableSlot.objects.all().order_by('start_time')
-        
-        # If the user is a lecturer, filter for their relevant slots
-        if hasattr(user, 'profile') and user.profile.role == 'lecturer':
-            # Use Q objects to find slots where the user is involved in any capacity
-            return TimetableSlot.objects.filter(
-                Q(project__supervisor=user) | 
-                Q(project__examiner=user) | 
-                Q(project__co_supervisor=user)
-            ).distinct().order_by('start_time')
-        
-        # For any other role (like students), return an empty list for this endpoint
-        return TimetableSlot.objects.none()
-
-# --- Custom Function-Based API Views ---
-
-# --- UPDATED: export_to_google_sheet with course filtering logic ---
 @api_view(['POST'])
 def export_to_google_sheet(request):
     user = request.user # Get the currently logged-in user
