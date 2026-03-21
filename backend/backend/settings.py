@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'api',
     'rest_framework',
+    'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
 ]
@@ -72,14 +73,14 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# --- REPLACE your existing REST_FRAMEWORK setting with this ---
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
 }
-
-# --- 【END OF CHANGE】 ---
 
 # We still need CORS settings to allow the frontend to connect
 CORS_ALLOW_ALL_ORIGINS = True
@@ -91,3 +92,10 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'your-email@gmail.com'
 EMAIL_HOST_PASSWORD = 'your-app-password'
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+}

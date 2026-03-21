@@ -1,6 +1,8 @@
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import viewsets
 from rest_framework.decorators import api_view
-from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
@@ -15,26 +17,50 @@ from .serializers import CourseSerializer, UserSerializer, FYPProjectSerializer,
 
 # --- ViewSets ---
 class CourseViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
 
 class UserViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
     queryset = User.objects.filter(is_active=True)
     serializer_class = UserSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['profile__role']
 
 class FYPProjectViewSet(viewsets.ModelViewSet):
-    queryset = FYPProject.objects.all().order_by('student_matric_id')
+    permission_classes = [IsAuthenticated]
     serializer_class = FYPProjectSerializer
+    
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['course', 'fyp_stage', 'supervisor']
 
+    def get_queryset(self):
+        user = self.request.user
+
+        if not hasattr(user, 'profile'):
+            return FYPProject.objects.none()
+
+        if user.profile.role == 'coordinator':
+            return FYPProject.objects.all().order_by('student_matric_id')
+        
+        elif user.profile.role == 'lecturer':
+            return FYPProject.objects.filter(
+                Q(supervisor=user) | Q(co_supervisor=user) | Q(examiner=user)
+            ).distinct().order_by('student_matric_id')
+
+        elif user.profile.role == 'student':
+            return FYPProject.objects.filter(student=user).order_by('student_matric_id')
+        
+        return FYPProject.objects.none()
+
 class TimetableBookingViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
     queryset = TimetableBooking.objects.all().order_by('start_time')
     serializer_class = TimetableBookingSerializer
 
 class TimetableSlotViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
     queryset = TimetableSlot.objects.all().order_by('start_time')
     
     serializer_class = TimetableSlotSerializer
@@ -118,3 +144,13 @@ def send_initial_notification(request):
     except Exception as e:
         error_message = f"An error occurred: {str(e)}"
         return Response({'status': 'error', 'message': error_message}, status=500)
+
+class CurrentUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        serializer = UserSerializer(user)
+        
+        return Response(serializer.data)
