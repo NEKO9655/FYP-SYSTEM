@@ -1,3 +1,4 @@
+# backend/api/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -12,15 +13,24 @@ from oauth2client.service_account import ServiceAccountCredentials
 import os
 from django.conf import settings
 
-from .models import Course, FYPProject, TimetableBooking, TimetableSlot
-from .serializers import CourseSerializer, UserSerializer, FYPProjectSerializer, TimetableBookingSerializer, TimetableSlotSerializer
+from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot
+from .serializers import (
+    CourseSerializer, UserSerializer, FYPProjectSerializer, 
+    TimetableBookingSerializer, TimetableSlotSerializer
+)
 
-# --- ViewSets ---
+# --- 1. CourseViewSet (保留协调员课程隔离) ---
 class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = Course.objects.all()
     serializer_class = CourseSerializer
 
+    def get_queryset(self):
+        user = self.request.user
+        if hasattr(user, 'profile') and user.profile.role == 'coordinator' and user.profile.course:
+            return Course.objects.filter(id=user.profile.course.id)
+        return Course.objects.all()
+
+# --- 2. UserViewSet (用于考官下拉列表) ---
 class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = User.objects.filter(is_active=True)
@@ -28,54 +38,103 @@ class UserViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['profile__role']
 
+# --- 3. FYPProjectViewSet (保留角色隔离与学号排序) ---
 class FYPProjectViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = FYPProjectSerializer
-    
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['course', 'fyp_stage', 'supervisor']
+    filterset_fields = ['student__profile__course', 'fyp_stage', 'supervisor']
 
     def get_queryset(self):
         user = self.request.user
-
         if not hasattr(user, 'profile'):
             return FYPProject.objects.none()
 
-        if user.profile.role == 'coordinator':
-            return FYPProject.objects.all().order_by('student_matric_id')
+        profile = user.profile
+
+        if profile.role == 'coordinator':
+            if profile.course:
+                queryset = FYPProject.objects.filter(student__profile__course=profile.course)
+            else:
+                queryset = FYPProject.objects.all()
         
-        elif user.profile.role == 'lecturer':
-            return FYPProject.objects.filter(
+        elif profile.role == 'lecturer':
+            queryset = FYPProject.objects.filter(
                 Q(supervisor=user) | Q(co_supervisor=user) | Q(examiner=user)
-            ).distinct().order_by('student_matric_id')
+            ).distinct()
 
-        elif user.profile.role == 'student':
-            return FYPProject.objects.filter(student=user).order_by('student_matric_id')
-        
-        return FYPProject.objects.none()
+        else:
+            queryset = FYPProject.objects.filter(student=user)
 
+        # 核心要求：统一按学号排序
+        return queryset.order_by('student_matric_id')
+
+# --- 4. TimetableBookingViewSet (增强：支持双向占用可见) ---
 class TimetableBookingViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = TimetableBooking.objects.all().order_by('start_time')
     serializer_class = TimetableBookingSerializer
 
+    def get_queryset(self):
+        user = self.request.user
+        if not hasattr(user, 'profile'):
+            return TimetableBooking.objects.none()
+
+        # 【核心逻辑】：
+        # 1. 讲师作为发起人 (Supervisor) 看到的预约
+        # 2. 讲师作为被邀请人 (Examiner) 看到的预约
+        # 3. 协调员看到全部
+        if user.profile.role == 'coordinator':
+            return TimetableBooking.objects.all().order_by('start_time')
+        
+        return TimetableBooking.objects.filter(
+            Q(lecturer=user) | Q(examiner=user)
+        ).distinct().order_by('start_time')
+
+    def perform_create(self, serializer):
+        # 自动将当前登录讲师设为预约发起人
+        serializer.save(lecturer=self.request.user)
+
+# --- 5. TimetableSlotViewSet (保留答辩时间表隔离) ---
 class TimetableSlotViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = TimetableSlot.objects.all().order_by('start_time')
-    
     serializer_class = TimetableSlotSerializer
-    
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['project__course']
+    filterset_fields = ['project__student__profile__course']
 
+    def get_queryset(self):
+        user = self.request.user
+        if not hasattr(user, 'profile'):
+            return TimetableSlot.objects.none()
+
+        profile = user.profile
+
+        if profile.role == 'coordinator':
+            if profile.course:
+                queryset = TimetableSlot.objects.filter(project__student__profile__course=profile.course)
+            else:
+                queryset = TimetableSlot.objects.all()
+        
+        elif profile.role == 'lecturer':
+            queryset = TimetableSlot.objects.filter(
+                Q(project__supervisor=user) | 
+                Q(project__co_supervisor=user) | 
+                Q(project__examiner=user)
+            ).distinct()
+            
+        else:
+            queryset = TimetableSlot.objects.filter(project__student=user)
+            
+        return queryset.order_by('start_time')
+
+# --- 6. Google Sheets 导出功能 (保留全部逻辑) ---
 @api_view(['POST'])
 def export_to_google_sheet(request):
-    user = request.user # Get the currently logged-in user
-
+    user = request.user
     try:
         scope = [
             'https://www.googleapis.com/auth/spreadsheets',
-            "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"
+            "https://www.googleapis.com/auth/drive.file", 
+            "https://www.googleapis.com/auth/drive"
         ]
         keyfile_path = os.path.join(settings.BASE_DIR, 'backend', 'client_secret.json')
         creds = ServiceAccountCredentials.from_json_keyfile_name(keyfile_path, scope)
@@ -84,28 +143,30 @@ def export_to_google_sheet(request):
         sheet_name = 'FYP_Schedule_Sheet'
         sheet = client.open(sheet_name).sheet1
         
-        # Start with all slots
         slots_queryset = TimetableSlot.objects.all()
 
-        # If the user is a coordinator and has an assigned course, filter the slots
         if hasattr(user, 'profile') and user.profile.role == 'coordinator' and user.profile.course:
-            slots_queryset = slots_queryset.filter(project__course=user.profile.course)
+            slots_queryset = slots_queryset.filter(project__student__profile__course=user.profile.course)
         
         slots = slots_queryset.order_by('start_time')
         
-        header = ['Date', 'Time Slot', 'Venue', 'Student', 'Project Title', 'Your Role']
+        header = ['Date', 'Time Slot', 'Venue', 'Student ID', 'Student Name', 'Project Title', 'Supervisor']
         data_to_write = [header]
         
         for slot in slots:
-            student_name = "N/A"
-            if slot.project and slot.project.student and hasattr(slot.project.student, 'profile'):
-                student_name = slot.project.student.profile.full_name or slot.project.student.username
+            student_profile = slot.project.student.profile if slot.project and slot.project.student else None
+            student_name = student_profile.full_name if student_profile else "N/A"
+            student_id = slot.project.student_matric_id if slot.project else "N/A"
+            supervisor_name = slot.project.supervisor.profile.full_name if slot.project and slot.project.supervisor else "N/A"
+
             row = [
                 str(slot.start_time.date()),
                 f"{slot.start_time.strftime('%I:%M %p')} - {slot.end_time.strftime('%I:%M %p')}",
-                slot.venue, student_name,
+                slot.venue,
+                student_id,
+                student_name,
                 slot.project.title if slot.project else 'N/A',
-                'Supervisor' # Role logic needs enhancement in the future
+                supervisor_name
             ]
             data_to_write.append(row)
         
@@ -115,13 +176,10 @@ def export_to_google_sheet(request):
         spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{sheet.spreadsheet.id}"
         return Response({'status': 'success', 'url': spreadsheet_url})
         
-    except FileNotFoundError:
-        return Response({'status': 'error', 'message': "CRITICAL: 'client_secret.json' not found."}, status=500)
-    except gspread.exceptions.SpreadsheetNotFound:
-        return Response({'status': 'error', 'message': f"Spreadsheet '{sheet_name}' not found."}, status=404)
     except Exception as e:
-        return Response({'status': 'error', 'message': f"An unexpected error occurred: {str(e)}"}, status=500)
+        return Response({'status': 'error', 'message': str(e)}, status=500)
 
+# --- 7. 发送邮件通知 (保留) ---
 @api_view(['POST'])
 def send_initial_notification(request):
     try:
@@ -131,26 +189,19 @@ def send_initial_notification(request):
         if recipient_list:
             send_mail(
                 subject='Reminder: Please Submit Your FYP Availability',
-                message='Dear Lecturers,\n\nPlease log in to the FYPHub to submit your available time slots...\n\nThank you.',
-                from_email='your-fyp-system-email@uts.edu.my',
+                message='Dear Lecturers,\n\nPlease log in to the FYPHub to submit your available time slots.\n\nThank you.',
+                from_email='your-fyp-system@uts.edu.my',
                 recipient_list=recipient_list,
                 fail_silently=False,
             )
-            success_message = f"Successfully sent notifications to {len(recipient_list)} lecturers."
-            return Response({'status': 'success', 'message': success_message})
-        else:
-            no_recipients_message = "No lecturers with valid email addresses found."
-            return Response({'status': 'success', 'message': no_recipients_message})
+            return Response({'status': 'success', 'message': f'Sent to {len(recipient_list)} lecturers.'})
+        return Response({'status': 'success', 'message': 'No recipients found.'})
     except Exception as e:
-        error_message = f"An error occurred: {str(e)}"
-        return Response({'status': 'error', 'message': error_message}, status=500)
+        return Response({'status': 'error', 'message': str(e)}, status=500)
 
+# --- 8. 当前用户信息 (保留) ---
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
-
     def get(self, request):
-        user = request.user
-        
-        serializer = UserSerializer(user)
-        
+        serializer = UserSerializer(request.user)
         return Response(serializer.data)

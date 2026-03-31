@@ -1,131 +1,145 @@
-# --- File: backend/api/management/commands/import_data.py (FINAL DEBUGGING VERSION) ---
-
+# api/management/commands/import_data.py
 import pandas as pd
+import numpy as np
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from api.models import Profile, Course, FYPProject, TimetableSlot
-from django.utils import timezone
 
 class Command(BaseCommand):
-    help = 'Imports data from Excel files for users, projects, and slots.'
+    help = 'Complete and robust data import: Full Name, Matric ID, Co-Supervisor included'
 
-    def handle(self, *args, **options):
-        # --- Clean up old data ---
-        self.stdout.write("Deleting old data...")
-        TimetableSlot.objects.all().delete()
-        FYPProject.objects.all().delete()
-        User.objects.filter(is_superuser=False).delete()
-        Course.objects.all().delete()
-        self.stdout.write(self.style.SUCCESS("Old data deleted."))
-
-        # --- Read the main data file ---
-        students_file_path = 'students_data.xlsx'
+    def handle(self, *args, **kwargs):
+        # 1. 准备阶段：加载并清洗数据
         try:
-            df = pd.read_excel(students_file_path).fillna('')
-        except FileNotFoundError:
-            self.stderr.write(self.style.ERROR(f"CRITICAL: '{students_file_path}' not found. Aborting."))
+            df_main = pd.read_excel('students_data.xlsx')
+            # 将所有 Excel 的空值转换为 None，防止出现 NaN 报错
+            df_main = df_main.replace({np.nan: None})
+            self.stdout.write("Processing students_data.xlsx...")
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"Critical: Could not read students_data.xlsx: {e}"))
             return
 
-        # --- PASS 1: Create all Courses and Users ---
-        self.stdout.write("Starting Pass 1: Creating Courses and Users...")
-        for index, row in df.iterrows():
-            course = None
-            if row.get('course_code'):
-                course, _ = Course.objects.get_or_create(code=row.get('course_code'), defaults={'name': f"Course for {row.get('course_code')}"})
-            username = str(row.get('username', '')).strip()
-            if username:
-                user, created = User.objects.get_or_create(username=username)
-                if created: user.set_password('password123');
-                user.email = str(row.get('email', '')).strip()
+        # --- 步骤 1: 全局用户注册 (确保所有引用的账号都存在) ---
+        self.stdout.write("Step 1: Registering all unique User accounts...")
+        # 收集所有可能出现的用户名（学生、主导师、副导师）
+        all_potential_usernames = set()
+        
+        cols_to_check = ['username', 'supervisor_username', 'co_supervisor_username']
+        for col in cols_to_check:
+            if col in df_main.columns:
+                # 过滤掉 None 和空字符串
+                valid_names = df_main[col].dropna().unique()
+                all_potential_usernames.update([str(n).strip() for n in valid_names if str(n).strip()])
+
+        for uname in all_potential_usernames:
+            if uname.lower() == 'none' or not uname: continue
+            user, created = User.objects.get_or_create(username=uname)
+            if created:
+                user.set_password('wow12345')
                 user.save()
-                Profile.objects.update_or_create(user=user, defaults={
-                    'full_name': str(row.get('full_name', '')).strip(),
-                    'role': str(row.get('role', 'student')).strip().lower(),
-                    'course': course
-                })
-        self.stdout.write(self.style.SUCCESS("Pass 1 completed."))
 
-        # --- PASS 2: Create FYPProjects with DEBUGGING ---
-        self.stdout.write("Starting Pass 2: Creating and linking FYP Projects...")
-        project_titles_created = [] # A list to track successfully created project titles
-        for index, row in df.iterrows():
-            role = str(row.get('role', '')).strip().lower()
-            project_title = str(row.get('project_title', '')).strip()
+        # --- 步骤 2: 完善 Profile (导入 Full Name, Course, Role) ---
+        self.stdout.write("Step 2: Updating Profiles (Full Name & Roles)...")
+        for _, row in df_main.iterrows():
+            uname = str(row.get('username', '')).strip()
+            # 跳过空行或无效行
+            if not uname or uname.lower() == 'none': continue
 
-            if role == 'student' and project_title:
-                try:
-                    student_user = User.objects.get(username=row.get('username'))
-                    supervisor = User.objects.filter(username=row.get('supervisor_username')).first()
-                    co_supervisor = User.objects.filter(username=row.get('co_supervisor_username')).first()
-                    examiner = User.objects.filter(username=row.get('examiner_username')).first()
-                    course = Course.objects.filter(code=row.get('course_code')).first()
-                    
-                    project, created = FYPProject.objects.get_or_create(
-                        student=student_user,
-                        defaults={
-                            'title': project_title,
-                            'student_matric_id': str(row.get('student_matric_id', '')).strip(),
-                            'fyp_stage': str(row.get('fyp_stage', 'FYP1')).strip(),
-                            'course': course,
-                            'supervisor': supervisor,
-                            'co_supervisor': co_supervisor,
-                            'examiner': examiner,
-                        }
-                    )
-                    if created:
-                        project_titles_created.append(project.title) # Record the title
-
-                except User.DoesNotExist:
-                    self.stderr.write(self.style.WARNING(f"Pass 2 Warning: Skipping project for non-existent user '{row.get('username')}'."))
-        
-        self.stdout.write(self.style.SUCCESS("Pass 2 completed."))
-        
-        # --- CRUCIAL DEBUG OUTPUT ---
-        self.stdout.write("--- DEBUG: Titles created in Pass 2 ---")
-        if project_titles_created:
-            for title in project_titles_created:
-                self.stdout.write(f"- '{title}'")
-        else:
-            self.stdout.write(self.style.WARNING("!!! NO PROJECTS WERE CREATED IN PASS 2 !!! Check 'students_data.xlsx' for correct headers ('project_title', 'role') and content."))
-        self.stdout.write("------------------------------------")
-        
-        # --- PASS 3: Import Timetable Slots ---
-        self.stdout.write("Starting Pass 3: Importing Timetable Slots...")
-        slots_file_path = 'slots_data.xlsx'
-        try:
-            slots_df = pd.read_excel(slots_file_path).fillna('')
-
-            for index, row in slots_df.iterrows():
-                project_title_to_find = str(row.get('project_title', '')).strip()
-                project = FYPProject.objects.filter(title=project_title_to_find).first()
+            try:
+                user = User.objects.get(username=uname)
                 
-                if not project:
-                    self.stderr.write(self.style.WARNING(f"Pass 3 Warning: Skipping slot for non-existent project: '{project_title_to_find}'"))
-                    continue
-                
-                naive_start_time = row.get('start_time')
-                naive_end_time = row.get('end_time')
-
-                if pd.notna(naive_start_time) and pd.notna(naive_end_time):
-                    aware_start_time = timezone.make_aware(naive_start_time)
-                    aware_end_time = timezone.make_aware(naive_end_time)
-
-                slot = TimetableSlot.objects.create(
-                    project=project,
-                    start_time=aware_start_time,
-                    end_time=aware_end_time,
-                    venue=str(row.get('venue', '')).strip()
+                # 处理课程
+                course_code = str(row.get('course_code', 'General')).strip()
+                course, _ = Course.objects.get_or_create(
+                    code=course_code,
+                    defaults={'name': course_code}
                 )
+                
+                # 导入 Full Name
+                Profile.objects.update_or_create(
+                    user=user,
+                    defaults={
+                        'full_name': row.get('full_name'), # 关键：导入全名
+                        'role': str(row.get('role', 'student')).lower(),
+                        'course': course,
+                    }
+                )
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f"Skipping profile for {uname}: {e}"))
 
-                examiner_names_str = str(row.get('examiner_usernames', ''))
-                examiner_names = [name.strip() for name in examiner_names_str.split(',') if name.strip()]
-                if examiner_names:
-                    examiners = User.objects.filter(username__in=examiner_names)
-                    slot.examiners.set(examiners)
-            else:
-                self.stderr.write(self.style.WARNING(f"Pass 3 Warning: Skipping slot for project '{project_title_to_find}' due to invalid time format."))
-        
-        except FileNotFoundError:
-            self.stdout.write(self.style.NOTICE(f"'{slots_file_path}' not found, skipping slot import."))
-        
-        self.stdout.write(self.style.SUCCESS("Data import finished!"))
+        # --- 步骤 3: 建立项目关系 (导入 Matric ID & Co-Supervisor) ---
+        self.stdout.write("Step 3: Creating Projects and linking Supervisors...")
+        for _, row in df_main.iterrows():
+            uname = str(row.get('username', '')).strip()
+            title = row.get('project_title')
+            
+            # 如果没有学生账号或没有项目标题，跳过
+            if not uname or uname.lower() == 'none' or not title: continue
+
+            try:
+                student_user = User.objects.get(username=uname)
+                
+                # 获取主导师
+                super_name = str(row.get('supervisor_username', '')).strip()
+                super_user = User.objects.get(username=super_name) if super_name and super_name.lower() != 'none' else None
+                
+                # 获取副导师 (Co-Supervisor)
+                co_super_name = str(row.get('co_supervisor_username', '')).strip()
+                co_super_user = User.objects.get(username=co_super_name) if co_super_name and co_super_name.lower() != 'none' else None
+
+                # 存入项目资料
+                FYPProject.objects.update_or_create(
+                    title=str(title).strip(),
+                    defaults={
+                        'student': student_user,
+                        'student_matric_id': row.get('student_matric_id'), # 关键：导入学号
+                        'supervisor': super_user,
+                        'co_supervisor': co_super_user, # 关键：导入副导师
+                        'fyp_stage': row.get('fyp_stage', 'FYP1'),
+                    }
+                )
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f"Failed to create project '{title}': {e}"))
+
+        self.stdout.write(self.style.SUCCESS("Phase 1 & 2 Complete!"))
+
+        # --- 步骤 4: 导入时间表和考官 (来自 slots_data.xlsx) ---
+        try:
+            df_slots = pd.read_excel('slots_data.xlsx')
+            df_slots = df_slots.replace({np.nan: None})
+            self.stdout.write("Step 4: Importing Slots and Examiners from slots_data.xlsx...")
+            
+            for _, row in df_slots.iterrows():
+                p_title = str(row.get('project_title', '')).strip()
+                if not p_title or p_title.lower() == 'none': continue
+                
+                try:
+                    project = FYPProject.objects.get(title=p_title)
+                    
+                    # 导入考官 (Examiner)
+                    ex_name = str(row.get('examiner_usernames', '')).strip()
+                    if ex_name and ex_name.lower() != 'none':
+                        ex_user, _ = User.objects.get_or_create(username=ex_name)
+                        # 确保考官也有 Profile
+                        Profile.objects.get_or_create(user=ex_user, defaults={'role': 'lecturer'})
+                        project.examiner = ex_user
+                        project.save()
+
+                    # 导入具体的 Slot
+                    if row.get('start_time'):
+                        TimetableSlot.objects.update_or_create(
+                            project=project,
+                            defaults={
+                                'start_time': row['start_time'],
+                                'end_time': row['end_time'],
+                                'venue': row['venue'],
+                            }
+                        )
+                except FYPProject.DoesNotExist:
+                    self.stdout.write(self.style.WARNING(f"Slot Error: Project '{p_title}' not found in database."))
+                except Exception as e:
+                    self.stdout.write(self.style.ERROR(f"Error in slot row: {e}"))
+
+            self.stdout.write(self.style.SUCCESS('--- ALL DATA IMPORTED SUCCESSFULLY ---'))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"Phase 4 Error: {e}"))

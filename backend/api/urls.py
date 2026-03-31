@@ -25,7 +25,7 @@ router = DefaultRouter()
 # 注意：我们为FYPProjectViewSet添加了basename，因为我们自定义了get_queryset
 router.register(r'projects', FYPProjectViewSet, basename='project')
 router.register(r'users', UserViewSet)
-router.register(r'courses', CourseViewSet)
+router.register(r'courses', CourseViewSet, basename='course')
 router.register(r'bookings', TimetableBookingViewSet, basename='timetablebooking')
 router.register(r'slots', TimetableSlotViewSet, basename='timetableslot')
 
