@@ -59,3 +59,15 @@ class TimetableSlot(models.Model):
     venue = models.CharField(max_length=100, blank=True)
     def __str__(self):
         return f"Slot for {self.project.title}"
+    
+class PresentationDay(models.Model):
+    date = models.DateField(verbose_name="Presentation Date")
+    # 关联课程：确保 BCS 协调员添加的天数，只有 BCS 的老师能看到
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='presentation_days')
+    
+    class Meta:
+        unique_together = ('date', 'course') # 同一课程不能重复添加同一天
+        ordering = ['date']
+
+    def __str__(self):
+        return f"{self.date} ({self.course.code})"

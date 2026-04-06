@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot
+from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot, PresentationDay
 
 class ProfileInline(admin.StackedInline):
     model = Profile
@@ -44,3 +44,8 @@ class CourseAdmin(admin.ModelAdmin):
 
 admin.site.register(TimetableBooking)
 admin.site.register(TimetableSlot)
+
+@admin.register(PresentationDay)
+class PresentationDayAdmin(admin.ModelAdmin):
+    list_display = ('date', 'course') # 在列表页显示日期和课程
+    list_filter = ('course',)         # 右侧增加按课程筛选

@@ -2,8 +2,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import viewsets
-from rest_framework.decorators import api_view
+from rest_framework import viewsets, status
+from rest_framework.decorators import api_view, permission_classes
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
@@ -13,13 +13,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 import os
 from django.conf import settings
 
-from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot
+from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot, PresentationDay
 from .serializers import (
     CourseSerializer, UserSerializer, FYPProjectSerializer, 
-    TimetableBookingSerializer, TimetableSlotSerializer
+    TimetableBookingSerializer, TimetableSlotSerializer, PresentationDaySerializer
 )
 
-# --- 1. CourseViewSet (保留协调员课程隔离) ---
+# --- 1. CourseViewSet ---
 class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = CourseSerializer
@@ -30,7 +30,7 @@ class CourseViewSet(viewsets.ModelViewSet):
             return Course.objects.filter(id=user.profile.course.id)
         return Course.objects.all()
 
-# --- 2. UserViewSet (用于考官下拉列表) ---
+# --- 2. UserViewSet ---
 class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = User.objects.filter(is_active=True)
@@ -38,7 +38,7 @@ class UserViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['profile__role']
 
-# --- 3. FYPProjectViewSet (保留角色隔离与学号排序) ---
+# --- 3. FYPProjectViewSet ---
 class FYPProjectViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = FYPProjectSerializer
@@ -51,50 +51,28 @@ class FYPProjectViewSet(viewsets.ModelViewSet):
             return FYPProject.objects.none()
 
         profile = user.profile
-
         if profile.role == 'coordinator':
-            if profile.course:
-                queryset = FYPProject.objects.filter(student__profile__course=profile.course)
-            else:
-                queryset = FYPProject.objects.all()
-        
+            queryset = FYPProject.objects.filter(student__profile__course=profile.course) if profile.course else FYPProject.objects.all()
         elif profile.role == 'lecturer':
-            queryset = FYPProject.objects.filter(
-                Q(supervisor=user) | Q(co_supervisor=user) | Q(examiner=user)
-            ).distinct()
-
+            queryset = FYPProject.objects.filter(Q(supervisor=user) | Q(co_supervisor=user) | Q(examiner=user)).distinct()
         else:
             queryset = FYPProject.objects.filter(student=user)
 
-        # 核心要求：统一按学号排序
         return queryset.order_by('student_matric_id')
 
-# --- 4. TimetableBookingViewSet (增强：支持双向占用可见) ---
+# --- 4. TimetableBookingViewSet ---
 class TimetableBookingViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = TimetableBookingSerializer
 
     def get_queryset(self):
-        user = self.request.user
-        if not hasattr(user, 'profile'):
-            return TimetableBooking.objects.none()
-
-        # 【核心逻辑】：
-        # 1. 讲师作为发起人 (Supervisor) 看到的预约
-        # 2. 讲师作为被邀请人 (Examiner) 看到的预约
-        # 3. 协调员看到全部
-        if user.profile.role == 'coordinator':
-            return TimetableBooking.objects.all().order_by('start_time')
-        
-        return TimetableBooking.objects.filter(
-            Q(lecturer=user) | Q(examiner=user)
-        ).distinct().order_by('start_time')
+        # 让所有人都能看到所有预约，以便前端显示红色的“Occupied”格子
+        return TimetableBooking.objects.all().order_by('start_time')
 
     def perform_create(self, serializer):
-        # 自动将当前登录讲师设为预约发起人
         serializer.save(lecturer=self.request.user)
 
-# --- 5. TimetableSlotViewSet (保留答辩时间表隔离) ---
+# --- 5. TimetableSlotViewSet ---
 class TimetableSlotViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = TimetableSlotSerializer
@@ -107,99 +85,105 @@ class TimetableSlotViewSet(viewsets.ModelViewSet):
             return TimetableSlot.objects.none()
 
         profile = user.profile
-
         if profile.role == 'coordinator':
-            if profile.course:
-                queryset = TimetableSlot.objects.filter(project__student__profile__course=profile.course)
-            else:
-                queryset = TimetableSlot.objects.all()
-        
+            queryset = TimetableSlot.objects.filter(project__student__profile__course=profile.course) if profile.course else TimetableSlot.objects.all()
         elif profile.role == 'lecturer':
-            queryset = TimetableSlot.objects.filter(
-                Q(project__supervisor=user) | 
-                Q(project__co_supervisor=user) | 
-                Q(project__examiner=user)
-            ).distinct()
-            
+            queryset = TimetableSlot.objects.filter(Q(project__supervisor=user) | Q(project__co_supervisor=user) | Q(project__examiner=user)).distinct()
         else:
             queryset = TimetableSlot.objects.filter(project__student=user)
             
         return queryset.order_by('start_time')
 
-# --- 6. Google Sheets 导出功能 (保留全部逻辑) ---
+# --- 6. PresentationDayViewSet (新增：由协调员管理日期) ---
+class PresentationDayViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PresentationDaySerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if not hasattr(user, 'profile'):
+            return PresentationDay.objects.none()
+            
+        # 协调员和讲师都只能看到所属课程的日期
+        if user.profile.course:
+            return PresentationDay.objects.filter(course=user.profile.course)
+        return PresentationDay.objects.all()
+
+    def perform_create(self, serializer):
+        # 自动绑定协调员的课程，增加安全检查
+        if hasattr(self.request.user, 'profile') and self.request.user.profile.course:
+            serializer.save(course=self.request.user.profile.course)
+        else:
+            # 如果没分配课程，默认保存但不指定课程（或者你可以根据需求报错）
+            serializer.save()
+
+# --- 7. 功能性接口：Google Sheets 导出 ---
 @api_view(['POST'])
 def export_to_google_sheet(request):
     user = request.user
     try:
-        scope = [
-            'https://www.googleapis.com/auth/spreadsheets',
-            "https://www.googleapis.com/auth/drive.file", 
-            "https://www.googleapis.com/auth/drive"
-        ]
+        scope = ['https://www.googleapis.com/auth/spreadsheets', "https://www.googleapis.com/auth/drive"]
         keyfile_path = os.path.join(settings.BASE_DIR, 'backend', 'client_secret.json')
         creds = ServiceAccountCredentials.from_json_keyfile_name(keyfile_path, scope)
         client = gspread.authorize(creds)
-        
-        sheet_name = 'FYP_Schedule_Sheet'
-        sheet = client.open(sheet_name).sheet1
+        sheet = client.open('FYP_Schedule_Sheet').sheet1
         
         slots_queryset = TimetableSlot.objects.all()
-
         if hasattr(user, 'profile') and user.profile.role == 'coordinator' and user.profile.course:
             slots_queryset = slots_queryset.filter(project__student__profile__course=user.profile.course)
         
         slots = slots_queryset.order_by('start_time')
-        
         header = ['Date', 'Time Slot', 'Venue', 'Student ID', 'Student Name', 'Project Title', 'Supervisor']
         data_to_write = [header]
         
         for slot in slots:
             student_profile = slot.project.student.profile if slot.project and slot.project.student else None
-            student_name = student_profile.full_name if student_profile else "N/A"
-            student_id = slot.project.student_matric_id if slot.project else "N/A"
-            supervisor_name = slot.project.supervisor.profile.full_name if slot.project and slot.project.supervisor else "N/A"
-
             row = [
                 str(slot.start_time.date()),
                 f"{slot.start_time.strftime('%I:%M %p')} - {slot.end_time.strftime('%I:%M %p')}",
                 slot.venue,
-                student_id,
-                student_name,
+                slot.project.student_matric_id if slot.project else "N/A",
+                student_profile.full_name if student_profile else "N/A",
                 slot.project.title if slot.project else 'N/A',
-                supervisor_name
+                slot.project.supervisor.profile.full_name if slot.project.supervisor else "N/A"
             ]
             data_to_write.append(row)
         
         sheet.clear()
         sheet.update('A1', data_to_write)
-        
-        spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{sheet.spreadsheet.id}"
-        return Response({'status': 'success', 'url': spreadsheet_url})
-        
+        return Response({'status': 'success', 'url': f"https://docs.google.com/spreadsheets/d/{sheet.spreadsheet.id}"})
     except Exception as e:
         return Response({'status': 'error', 'message': str(e)}, status=500)
 
-# --- 7. 发送邮件通知 (保留) ---
+# --- 8. 功能性接口：发送邮件通知 ---
 @api_view(['POST'])
 def send_initial_notification(request):
     try:
         lecturers = User.objects.filter(profile__role='lecturer', is_active=True)
-        recipient_list = [lecturer.email for lecturer in lecturers if lecturer.email]
-
+        recipient_list = [l.email for l in lecturers if l.email]
         if recipient_list:
-            send_mail(
-                subject='Reminder: Please Submit Your FYP Availability',
-                message='Dear Lecturers,\n\nPlease log in to the FYPHub to submit your available time slots.\n\nThank you.',
-                from_email='your-fyp-system@uts.edu.my',
-                recipient_list=recipient_list,
-                fail_silently=False,
-            )
-            return Response({'status': 'success', 'message': f'Sent to {len(recipient_list)} lecturers.'})
-        return Response({'status': 'success', 'message': 'No recipients found.'})
+            send_mail('Reminder: Submit FYP Availability', 'Please book slots in FYPHub.', 'fyp@uts.edu.my', recipient_list)
+            return Response({'status': 'success'})
+        return Response({'status': 'success', 'message': 'No emails found.'})
     except Exception as e:
         return Response({'status': 'error', 'message': str(e)}, status=500)
 
-# --- 8. 当前用户信息 (保留) ---
+# --- 9. 核心：自动化排程算法预留接口 (Phase 2 的天花板) ---
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def run_auto_scheduler(request):
+    """
+    即将在这里编写基于讲师连续性优先的排程算法逻辑。
+    目前先返回一个成功消息以供前端测试。
+    """
+    user = request.user
+    if user.profile.role != 'coordinator':
+        return Response({'error': 'Unauthorized'}, status=403)
+        
+    # TODO: 编写自动排程 Python 逻辑
+    return Response({'status': 'success', 'message': 'Auto-scheduler logic is being initialized...'})
+
+# --- 10. 获取当前用户信息 ---
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):

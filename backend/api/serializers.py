@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot
+from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot, PresentationDay
 
 class CourseSerializer(serializers.ModelSerializer):
     class Meta:
@@ -80,3 +80,8 @@ class TimetableBookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimetableBooking
         fields = ['id', 'lecturer', 'project', 'project_title', 'student_name', 'examiner', 'examiner_name', 'start_time', 'end_time', 'venue']
+
+class PresentationDaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PresentationDay
+        fields = ['id', 'date', 'course']
