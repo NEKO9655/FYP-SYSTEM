@@ -71,3 +71,14 @@ class PresentationDay(models.Model):
 
     def __str__(self):
         return f"{self.date} ({self.course.code})"
+
+class Venue(models.Model):
+    name = models.CharField(max_length=100) # 例如: CL3, CL4
+    # 同样关联课程，确保 BCS 协调员只管理自己的教室
+    course = models.ForeignKey(Course, on_object=models.CASCADE, related_name='venues')
+
+    class Meta:
+        unique_together = ('name', 'course')
+
+    def __str__(self):
+        return f"{self.name} ({self.course.code})"

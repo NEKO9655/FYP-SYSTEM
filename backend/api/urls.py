@@ -14,11 +14,12 @@ from .views import (
     FYPProjectViewSet,
     TimetableBookingViewSet,
     TimetableSlotViewSet,
-    PresentationDayViewSet,  # <-- 新增
+    PresentationDayViewSet,
     CurrentUserView,
     export_to_google_sheet,
     send_initial_notification,
-    run_auto_scheduler      # <-- 新增
+    run_auto_scheduler,
+    VenueViewSet
 )
 
 # 1. 使用 Router 处理 ViewSet (自动生成 GET/POST/PUT/DELETE 路由)
@@ -29,6 +30,7 @@ router.register(r'courses', CourseViewSet, basename='course')
 router.register(r'bookings', TimetableBookingViewSet, basename='timetablebooking')
 router.register(r'slots', TimetableSlotViewSet, basename='timetableslot')
 router.register(r'presentation-days', PresentationDayViewSet, basename='presentationday') # <-- 新增
+router.register(r'venues', VenueViewSet, basename='venue')
 
 # 2. 定义具体的 URL 路径
 urlpatterns = [

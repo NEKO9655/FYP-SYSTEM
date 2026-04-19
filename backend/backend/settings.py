@@ -66,7 +66,7 @@ AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Kuala_Lumpur'
-USE_I1N = True
+USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
@@ -90,8 +90,9 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your-email@gmail.com'
-EMAIL_HOST_PASSWORD = 'your-app-password'
+EMAIL_HOST_USER = 'bcs23090021@student.uts.edu.my'
+EMAIL_HOST_PASSWORD = 'gtvtcovybvwyqgbm'
+DEFAULT_FROM_EMAIL = 'FYPHub System <bcs23090021@student.uts.edu.my>'
 
 from datetime import timedelta
 

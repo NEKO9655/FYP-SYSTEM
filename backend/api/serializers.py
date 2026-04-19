@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot, PresentationDay
+from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot, PresentationDay, Venue
 
 class CourseSerializer(serializers.ModelSerializer):
     class Meta:
@@ -68,28 +68,36 @@ class TimetableSlotSerializer(serializers.ModelSerializer):
             'examiner_id', 'start_time', 'end_time', 'venue'
         ]
 
-# --- 重点修改：TimetableBookingSerializer ---
+
 class TimetableBookingSerializer(serializers.ModelSerializer):
     project_title = serializers.CharField(source='project.title', read_only=True)
     student_name = serializers.CharField(source='project.student.profile.full_name', read_only=True)
-    
-    # 【新增这一行】：获取学号
     student_id = serializers.CharField(source='project.student_matric_id', read_only=True)
     
+    # 【新增】获取预约讲师（负责人）的全名，解决老师提到的可见性问题
+    lecturer_name = serializers.CharField(source='lecturer.profile.full_name', read_only=True)
     examiner_name = serializers.CharField(source='examiner.profile.full_name', read_only=True)
-    lecturer = UserSerializer(read_only=True)
+    
+    # 为了方便前端判断角色，保留 lecturer 完整信息
+    lecturer_detail = UserSerializer(source='lecturer', read_only=True)
 
     class Meta:
         model = TimetableBooking
-        # 【确保 student_id 在 fields 列表中】
         fields = [
-            'id', 'lecturer', 'project', 'project_title', 
-            'student_name', 'student_id', 'examiner', 
-            'examiner_name', 'start_time', 'end_time', 'venue'
+            'id', 'lecturer', 'lecturer_detail', 'lecturer_name', 
+            'project', 'project_title', 'student_name', 'student_id', 
+            'examiner', 'examiner_name', 'start_time', 'end_time', 'venue'
         ]
+        read_only_fields = ['lecturer']
 
 class PresentationDaySerializer(serializers.ModelSerializer):
     class Meta:
         model = PresentationDay
         fields = ['id', 'date', 'course']
+        read_only_fields = ['course']
+
+class VenueSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Venue
+        fields = ['id', 'name', 'course']
         read_only_fields = ['course']
