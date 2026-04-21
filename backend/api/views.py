@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import viewsets, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
@@ -18,11 +18,16 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, time, timedelta
 
-from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot, PresentationDay, Venue
+from .models import (
+    Course, Profile, FYPProject, TimetableBooking, 
+    TimetableSlot, PresentationDay, Venue, 
+    Submissions, Feedback, MilestoneForms, MilestoneEntries, SupervisorQuotas
+)
 from .serializers import (
     CourseSerializer, UserSerializer, FYPProjectSerializer, 
     TimetableBookingSerializer, TimetableSlotSerializer, PresentationDaySerializer,
-    VenueSerializer
+    VenueSerializer, 
+    SubmissionSerializer, FeedbackSerializer, MilestoneFormsSerializer, MilestoneEntriesSerializer
 )
 
 # --- 1. CourseViewSet (保留课程隔离) ---
@@ -106,6 +111,70 @@ class PresentationDayViewSet(viewsets.ModelViewSet):
         else:
             from rest_framework.exceptions import ValidationError
             raise ValidationError({"course": "Coordinator must have an assigned course."})
+
+class SubmissionViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SubmissionSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.profile.role == 'student':
+            return Submissions.objects.filter(student=user)
+        elif user.profile.role == 'lecturer':
+            return Submissions.objects.filter(supervisor=user)
+        return Submissions.objects.all()
+
+    def perform_create(self, serializer):
+        # 对应队友 handle_submission 的逻辑
+        serializer.save(student=self.request.user, status='submitted')
+
+    @action(detail=True, methods=['post'])
+    def feedback(self, request, pk=None):
+        # 对应队友 submit_feedback 的逻辑
+        submission = self.get_object()
+        comment = request.data.get('comment')
+        new_status = request.data.get('new_status')
+        
+        # 1. 更新状态
+        submission.status = new_status
+        submission.save()
+        
+        # 2. 创建反馈记录
+        Feedback.objects.create(
+            submission=submission,
+            lecturer=request.user,
+            comment=comment
+        )
+        return Response({'success': True})
+
+# --- 9. 【队友功能】Milestones (记事本) ViewSet ---
+class MilestoneFormsViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MilestoneFormsSerializer
+
+    def get_queryset(self):
+        # 只有讲师能看他自己创建的记事本
+        return MilestoneForms.objects.filter(lecturer=self.request.user)
+
+    def perform_create(self, serializer):
+        form = serializer.save(lecturer=self.request.user)
+        # 自动创建 8 个空的里程碑条目 (对应队友 API 3 的初始化逻辑)
+        for i in range(1, 9):
+            MilestoneEntries.objects.create(form=form, milestone_number=i, status='pending')
+
+# --- 10. 【队友功能】Coordinator 统计逻辑 ---
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_overview_summary(request):
+    # 对应队友的 get_overview_summary
+    data = {
+        'total_students': User.objects.filter(profile__role='student').count(),
+        'total_supervisors': User.objects.filter(profile__role='lecturer').count(),
+        'projects_submitted': Submissions.objects.count(),
+        'approved_projects': Submissions.objects.filter(status='approved').count(),
+        'available_supervisors': 0 # 逻辑可根据 Quota 计算
+    }
+    return Response({'success': True, 'summary': data})
 
 # --- 7. 功能性接口: Google Sheets 导出 ---
 @api_view(['POST'])

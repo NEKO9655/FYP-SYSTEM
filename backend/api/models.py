@@ -1,6 +1,10 @@
-# --- File: backend/api/models.py ---
+# --- File: backend/api/models.py (终极缝合版) ---
 from django.db import models
 from django.contrib.auth.models import User
+
+# ==========================================
+# 1. 核心基础设施 (保留现有功能)
+# ==========================================
 
 class Course(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -14,8 +18,18 @@ class Profile(models.Model):
     full_name = models.CharField(max_length=255, blank=True, verbose_name="Full Name")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
     course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # --- 整合队友 Users 表中的特有字段 ---
+    phone_no = models.CharField(max_length=50, blank=True, null=True)
+    student_id_no = models.CharField(max_length=50, blank=True, null=True) # 对应队友的 student_id_no
+    programme = models.CharField(max_length=100, blank=True, null=True)    # 对应队友的 programme
+
     def __str__(self):
         return self.user.username
+
+# ==========================================
+# 2. 时间表模块 (保留现有功能)
+# ==========================================
 
 class FYPProject(models.Model):
     FYP_STAGE_CHOICES = (('FYP1', 'Final Year Project 1'), ('FYP2', 'Final Year Project 2'))
@@ -31,54 +45,103 @@ class FYPProject(models.Model):
         return self.title
 
 class TimetableBooking(models.Model):
-    # 发起预约的导师 (Supervisor)
     lecturer = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'profile__role': 'lecturer'})
-    # 关联的项目 (包含学生信息)
     project = models.ForeignKey(FYPProject, on_delete=models.SET_NULL, null=True, blank=True)
-    # 邀请的考官 (Examiner)
     examiner = models.ForeignKey(User, related_name='examiner_bookings', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'profile__role': 'lecturer'})
-    
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     venue = models.CharField(max_length=100, blank=True)
-
     class Meta:
-        # 防止同一时间、同一地点被重复预订 (双重预订预防)
         unique_together = ('start_time', 'venue')
         ordering = ['start_time']
 
-    def __str__(self):
-        return f"Booking: {self.project.title if self.project else 'Available'} ({self.venue})"
-
 class TimetableSlot(models.Model):
-    # 协调员最终确定的正式时间表
     project = models.ForeignKey(FYPProject, on_delete=models.CASCADE)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     examiners = models.ManyToManyField(User, limit_choices_to={'profile__role': 'lecturer'})
     venue = models.CharField(max_length=100, blank=True)
-    def __str__(self):
-        return f"Slot for {self.project.title}"
-    
-class PresentationDay(models.Model):
-    date = models.DateField(verbose_name="Presentation Date")
-    # 关联课程：确保 BCS 协调员添加的天数，只有 BCS 的老师能看到
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='presentation_days')
-    
-    class Meta:
-        unique_together = ('date', 'course') # 同一课程不能重复添加同一天
-        ordering = ['date']
 
-    def __str__(self):
-        return f"{self.date} ({self.course.code})"
+class PresentationDay(models.Model):
+    date = models.DateField()
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='presentation_days')
+    class Meta:
+        unique_together = ('date', 'course')
 
 class Venue(models.Model):
-    name = models.CharField(max_length=100) # 例如: CL3, CL4
-    # 同样关联课程，确保 BCS 协调员只管理自己的教室
-    course = models.ForeignKey(Course, on_object=models.CASCADE, related_name='venues')
-
+    name = models.CharField(max_length=100)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='venues')
     class Meta:
         unique_together = ('name', 'course')
 
-    def __str__(self):
-        return f"{self.name} ({self.course.code})"
+# ==========================================
+# 3. 新功能模块 (从队友 wow.py 缝合)
+# ==========================================
+
+class Announcements(models.Model):
+    # 关联到你的 User 系统
+    coordinator = models.ForeignKey(User, on_delete=models.CASCADE, db_column='coordinator_user_id')
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        db_table = 'announcements' # 确保对接队友的 SQL 表
+
+class Feedback(models.Model):
+    # 假设关联到 Submissions 表
+    submission = models.ForeignKey('Submissions', on_delete=models.CASCADE, db_column='submission_id')
+    lecturer = models.ForeignKey(User, on_delete=models.CASCADE, db_column='lecturer_user_id')
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+    class Meta:
+        db_table = 'feedback'
+
+class Submissions(models.Model):
+    """即 TRF Submission 核心表"""
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='my_submissions', db_column='student_user_id')
+    supervisor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='student_submissions', db_column='supervisor_user_id')
+    co_supervisor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, db_column='co_supervisor_user_id')
+    
+    student_name = models.CharField(max_length=255)
+    student_id_no = models.CharField(max_length=50)
+    phone_no = models.CharField(max_length=50, blank=True, null=True)
+    programme = models.CharField(max_length=100)
+    semester = models.CharField(max_length=50)
+    project_category = models.CharField(max_length=50)
+    proposed_project_title = models.TextField()
+    detail_description = models.TextField()
+    detail_problem = models.TextField()
+    detail_value = models.TextField()
+    detail_scope = models.TextField()
+    detail_similar_system = models.TextField()
+    detail_features = models.TextField()
+    document_path = models.CharField(max_length=255, blank=True, null=True)
+    status = models.CharField(max_length=50, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        db_table = 'submissions'
+
+class MilestoneForms(models.Model):
+    lecturer = models.ForeignKey(User, on_delete=models.CASCADE, db_column='lecturer_user_id')
+    student_name = models.CharField(max_length=255)
+    student_id_no = models.CharField(max_length=50, blank=True, null=True)
+    fyp_title = models.TextField()
+    supervisor_name = models.CharField(max_length=255)
+    class Meta:
+        db_table = 'milestone_forms'
+
+class MilestoneEntries(models.Model):
+    form = models.ForeignKey(MilestoneForms, on_delete=models.CASCADE, db_column='form_id', related_name='entries')
+    milestone_number = models.IntegerField()
+    score = models.IntegerField(blank=True, null=True)
+    status = models.CharField(max_length=20, default='pending')
+    class Meta:
+        db_table = 'milestone_entries'
+
+class SupervisorQuotas(models.Model):
+    lecturer = models.OneToOneField(User, on_delete=models.CASCADE, db_column='lecturer_user_id')
+    quota_total = models.IntegerField()
+    class Meta:
+        db_table = 'supervisor_quotas'

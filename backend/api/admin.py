@@ -1,7 +1,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Course, Profile, FYPProject, TimetableBooking, TimetableSlot, PresentationDay
+from .models import (
+    Course, Profile, FYPProject, TimetableBooking, 
+    TimetableSlot, PresentationDay, Venue,
+    Announcements, Feedback, Submissions, 
+    MilestoneForms, MilestoneEntries, SupervisorQuotas
+)
 
 class ProfileInline(admin.StackedInline):
     model = Profile
@@ -49,3 +54,23 @@ admin.site.register(TimetableSlot)
 class PresentationDayAdmin(admin.ModelAdmin):
     list_display = ('date', 'course') # 在列表页显示日期和课程
     list_filter = ('course',)         # 右侧增加按课程筛选
+
+@admin.register(Announcements)
+class AnnouncementsAdmin(admin.ModelAdmin):
+    list_display = ('title', 'coordinator', 'created_at') # 显示标题、发布人和时间
+
+@admin.register(Submissions)
+class SubmissionsAdmin(admin.ModelAdmin):
+    list_display = ('proposed_project_title', 'student_name', 'status', 'created_at')
+    list_filter = ('status', 'programme') # 侧边栏增加状态筛选
+
+@admin.register(Feedback)
+class FeedbackAdmin(admin.ModelAdmin):
+    list_display = ('submission', 'lecturer', 'created_at')
+
+@admin.register(MilestoneForms)
+class MilestoneFormsAdmin(admin.ModelAdmin):
+    list_display = ('student_name', 'fyp_title', 'lecturer')
+
+admin.site.register(MilestoneEntries)
+admin.site.register(SupervisorQuotas)

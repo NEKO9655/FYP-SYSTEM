@@ -57,8 +57,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'fyp_hub_db',      # 刚才创建的数据库名
+        'USER': 'root',            # XAMPP 默认用户名
+        'PASSWORD': '',            # XAMPP 默认密码为空
+        'HOST': '127.0.0.1',
+        'PORT': '3306',
     }
 }
 
