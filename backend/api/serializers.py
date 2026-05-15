@@ -1,72 +1,49 @@
-# --- File: backend/api/serializers.py (补全修正版) ---
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
-    Course, Profile, FYPProject, TimetableBooking, 
-    TimetableSlot, PresentationDay, Venue, 
-    Submissions, Feedback, MilestoneForms, MilestoneEntries, SupervisorQuotas
+    Programme, Profile, FYPProject, TimetableBooking, 
+    TimetableSlot, PresentationDay, Venue, PresentationSlot,
+    Submissions, Feedback, MilestoneForms, MilestoneEntries, 
+    SupervisorQuotas, Announcements, LecturerPreference,
+    RubricTemplate, RubricMarks
 )
 
-# --- 1. 基础序列化器 ---
-class CourseSerializer(serializers.ModelSerializer):
+class ProgrammeSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Course
+        model = Programme
         fields = ['id', 'name', 'code']
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source='profile.full_name', read_only=True)
     role = serializers.CharField(source='profile.role', read_only=True)
+    student_id_no = serializers.CharField(source='profile.student_id_no', read_only=True)
+    programme_id = serializers.IntegerField(source='profile.programme.id', read_only=True, allow_null=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'email', 'role']
+        fields = ['id', 'username', 'full_name', 'email', 'role', 'student_id_no', 'programme_id']
 
-# --- 2. 队友功能：TRF Submissions ---
 class SubmissionSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.profile.full_name', read_only=True)
-    supervisor_name = serializers.CharField(source='supervisor.profile.full_name', read_only=True)
+    supervisor_name = serializers.CharField(source='supervisor.profile.full_name', read_only=True, allow_null=True)
+    
+    # 这两行是正确的，确保它们存在
+    supervisor = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), allow_null=True, required=False)
+    co_supervisor = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), allow_null=True, required=False)
+
     class Meta:
         model = Submissions
         fields = '__all__'
         read_only_fields = ['student', 'status']
 
-# --- 3. 队友功能：Feedback ---
-class FeedbackSerializer(serializers.ModelSerializer):
-    lecturer_name = serializers.CharField(source='lecturer.profile.full_name', read_only=True)
-    class Meta:
-        model = Feedback
-        fields = '__all__'
-
-# --- 4. 队友功能：Milestones (记事本) ---
-class MilestoneEntriesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MilestoneEntries
-        fields = '__all__'
-
-class MilestoneFormsSerializer(serializers.ModelSerializer):
-    entries = MilestoneEntriesSerializer(many=True, read_only=True)
-    progress = serializers.SerializerMethodField()
-
-    class Meta:
-        model = MilestoneForms
-        fields = '__all__'
-
-    def get_progress(self, obj):
-        approved_count = obj.entries.filter(status='approved').count()
-        return f"{approved_count} / 8"
-
-# --- 5. 原有功能：时间表与预约 ---
 class FYPProjectSerializer(serializers.ModelSerializer):
-    student_name = serializers.SerializerMethodField()
-    supervisor_name = serializers.SerializerMethodField()
+    student_name = serializers.ReadOnlyField(source='student.profile.full_name')
+    supervisor_name = serializers.ReadOnlyField(source='supervisor.profile.full_name')
+    co_supervisor_name = serializers.ReadOnlyField(source='co_supervisor.profile.full_name')
+    examiner_name = serializers.ReadOnlyField(source='examiner.profile.full_name')
     class Meta:
         model = FYPProject
         fields = '__all__'
-    def get_student_name(self, obj):
-        try: return obj.student.profile.full_name or obj.student.username
-        except: return "N/A"
-    def get_supervisor_name(self, obj):
-        try: return obj.supervisor.profile.full_name or obj.supervisor.username
-        except: return "N/A"
 
 class TimetableBookingSerializer(serializers.ModelSerializer):
     project_title = serializers.CharField(source='project.title', read_only=True)
@@ -79,28 +56,102 @@ class TimetableBookingSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['lecturer']
 
-# --- 【关键补全】：TimetableSlotSerializer ---
 class TimetableSlotSerializer(serializers.ModelSerializer):
     project_title = serializers.CharField(source='project.title', read_only=True)
     student_name = serializers.CharField(source='project.student.profile.full_name', read_only=True)
     student_id = serializers.CharField(source='project.student_matric_id', read_only=True)
     
-    supervisor_id = serializers.IntegerField(source='project.supervisor.id', read_only=True)
-    co_supervisor_id = serializers.IntegerField(source='project.co_supervisor.id', read_only=True, allow_null=True)
-    
     class Meta:
         model = TimetableSlot
-        fields = '__all__'
+        fields = ['id', 'project', 'project_title', 'student_name', 'student_id', 'start_time', 'end_time', 'venue']
 
-# --- 6. 其他设置 ---
-class PresentationDaySerializer(serializers.ModelSerializer):
+class AnnouncementSerializer(serializers.ModelSerializer):
+    coordinator_name = serializers.CharField(source='coordinator.profile.full_name', read_only=True)
+    class Meta:
+        model = Announcements
+        fields = ['id', 'title', 'content', 'created_at', 'coordinator_name']
+        read_only_fields = ['coordinator']
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    lecturer_name = serializers.CharField(source='lecturer.profile.full_name', read_only=True)
+    class Meta:
+        model = Feedback
+        fields = ['id', 'submission', 'lecturer', 'lecturer_name', 'comment', 'created_at', 'is_read']
+        read_only_fields = ['lecturer']
+
+class MilestoneEntriesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MilestoneEntries
+        fields = ['id', 'form', 'milestone_number', 'milestone_name', 'max_marks', 'score', 'status']
+        read_only_fields = ['id', 'form']
+
+class MilestoneFormsSerializer(serializers.ModelSerializer):
+    entries = MilestoneEntriesSerializer(many=True, read_only=True)
+    progress = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MilestoneForms
+        fields = '__all__'
+        read_only_fields = ['lecturer']
+        
+    def get_progress(self, obj):
+        approved_count = obj.entries.filter(status='approved').count()
+        return f"{approved_count} / 8"
+
+    def update(self, instance, validated_data):
+        entries_data = self.context['request'].data.get('entries', [])
+        
+        instance.student_name = validated_data.get('student_name', instance.student_name)
+        instance.fyp_title = validated_data.get('fyp_title', instance.fyp_title)
+        instance.save()
+
+        for entry_data in entries_data:
+            entry_id = entry_data.get('id', None)
+            if entry_id:
+                try:
+                    entry = MilestoneEntries.objects.get(id=entry_id, form=instance)
+                    score_value = entry_data.get('score', entry.score)
+                    entry.score = int(score_value) if score_value is not None and score_value != '' else None
+                    entry.status = entry_data.get('status', entry.status)
+                    entry.save()
+                except (MilestoneEntries.DoesNotExist, ValueError):
+                    pass
+        
+        return instance
+
+class PresentationSlotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PresentationSlot  # 这里引用的名字必须和导入的一模一样
+        fields = ['id', 'date', 'venue_name'] # 确保这些字段在 models.py 的 PresentationSlot 中存在
+        read_only_fields = ['programme']
+        
+class SimplePresentationDaySerializer(serializers.ModelSerializer):
     class Meta:
         model = PresentationDay
-        fields = '__all__'
-        read_only_fields = ['course']
+        fields = ['id', 'date']
 
-class VenueSerializer(serializers.ModelSerializer):
+class LecturerPreferenceSerializer(serializers.ModelSerializer):
+    # 这里也必须更新！
+    presentation_slot = PresentationSlotSerializer(read_only=True)
+    presentation_slot_id = serializers.PrimaryKeyRelatedField(
+        queryset=PresentationSlot.objects.all(), 
+        source='presentation_slot', 
+        write_only=True
+    )
+
     class Meta:
-        model = Venue
+        model = LecturerPreference
+        fields =['id', 'lecturer', 'presentation_slot', 'presentation_slot_id', 'unavailable_slots']
+        read_only_fields = ['lecturer']
+
+class RubricTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RubricTemplate
         fields = '__all__'
-        read_only_fields = ['course']
+        read_only_fields = ['created_by']
+
+class RubricMarksSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RubricMarks
+        fields = '__all__'
+        read_only_fields = ['evaluated_by']

@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
+    'django_extensions',
 ]
 
 MIDDLEWARE = [
@@ -92,11 +93,15 @@ CORS_ALLOW_ALL_ORIGINS = True
 # --- Email settings (remains unchanged) ---
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+# EMAIL_PORT = 587        # 注释掉或删除这一行
+# EMAIL_USE_TLS = True    # 注释掉或删除这一行
+
+EMAIL_USE_SSL = True      # 【新增】改用 SSL
+EMAIL_PORT = 465          # 【新增】SSL 使用 465 端口
+
 EMAIL_HOST_USER = 'bcs23090021@student.uts.edu.my'
-EMAIL_HOST_PASSWORD = 'gtvtcovybvwyqgbm'
-DEFAULT_FROM_EMAIL = 'FYPHub System <bcs23090021@student.uts.edu.my>'
+EMAIL_HOST_PASSWORD = 'scngausbilppanod' 
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 from datetime import timedelta
 
