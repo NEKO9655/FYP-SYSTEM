@@ -26,8 +26,6 @@ class UserSerializer(serializers.ModelSerializer):
 class SubmissionSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.profile.full_name', read_only=True)
     supervisor_name = serializers.CharField(source='supervisor.profile.full_name', read_only=True, allow_null=True)
-    
-    # 这两行是正确的，确保它们存在
     supervisor = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), allow_null=True, required=False)
     co_supervisor = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), allow_null=True, required=False)
 
@@ -121,8 +119,8 @@ class MilestoneFormsSerializer(serializers.ModelSerializer):
 
 class PresentationSlotSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PresentationSlot  # 这里引用的名字必须和导入的一模一样
-        fields = ['id', 'date', 'venue_name'] # 确保这些字段在 models.py 的 PresentationSlot 中存在
+        model = PresentationSlot
+        fields = ['id', 'date', 'venue_name']
         read_only_fields = ['programme']
         
 class SimplePresentationDaySerializer(serializers.ModelSerializer):
@@ -131,7 +129,6 @@ class SimplePresentationDaySerializer(serializers.ModelSerializer):
         fields = ['id', 'date']
 
 class LecturerPreferenceSerializer(serializers.ModelSerializer):
-    # 这里也必须更新！
     presentation_slot = PresentationSlotSerializer(read_only=True)
     presentation_slot_id = serializers.PrimaryKeyRelatedField(
         queryset=PresentationSlot.objects.all(), 

@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
 
-# --- 基础模型 ---
 class Programme(models.Model):
     name = models.CharField(max_length=100, unique=True)
     code = models.CharField(max_length=10, unique=True)
@@ -20,7 +19,7 @@ class Profile(models.Model):
         return self.user.username
 
 class FYPProject(models.Model):
-    FYP_STAGE_CHOICES = (('FYP1', 'Final Year Project 1'), ('FYP2', 'Final Year Project 2'))
+    FYP_STAGE_CHOICES = (('PROPOSAL', 'Proposal Defense'),('FYP1', 'Final Year Project 1'), ('FYP2', 'Final Year Project 2'))
     student = models.OneToOneField(User, on_delete=models.CASCADE, limit_choices_to={'profile__role': 'student'})
     student_matric_id = models.CharField(max_length=50, blank=True, verbose_name="Student ID")
     title = models.CharField(max_length=255)
@@ -28,11 +27,10 @@ class FYPProject(models.Model):
     co_supervisor = models.ForeignKey(User, related_name='cosupervised_projects', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'profile__role': 'lecturer'})
     examiner = models.ForeignKey(User, related_name='examined_projects', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'profile__role': 'lecturer'})
     programme = models.ForeignKey(Programme, on_delete=models.SET_NULL, null=True, blank=True)
-    fyp_stage = models.CharField(max_length=10, choices=FYP_STAGE_CHOICES, default='FYP1')
+    fyp_stage = models.CharField(max_length=20, choices=FYP_STAGE_CHOICES, default='FYP1')
     def __str__(self):
         return self.title
 
-# --- 资源模型 (保留原有) ---
 class PresentationDay(models.Model):
     date = models.DateField()
     programme = models.ForeignKey(Programme, on_delete=models.CASCADE, related_name='presentation_days') 
@@ -45,7 +43,6 @@ class Venue(models.Model):
     class Meta:
         unique_together = ('name', 'programme')
 
-# --- 新增的强绑定 Slot 模型 ---
 class PresentationSlot(models.Model):
     programme = models.ForeignKey(Programme, on_delete=models.CASCADE)
     date = models.DateField()
@@ -54,7 +51,6 @@ class PresentationSlot(models.Model):
     class Meta:
         unique_together = ('programme', 'date', 'venue_name')
 
-# --- 业务模型 ---
 class TimetableBooking(models.Model):
     lecturer = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'profile__role': 'lecturer'})
     project = models.ForeignKey(FYPProject, on_delete=models.SET_NULL, null=True, blank=True)
@@ -147,7 +143,6 @@ class LecturerPreference(models.Model):
         on_delete=models.CASCADE, 
         limit_choices_to=models.Q(profile__role='lecturer') | models.Q(profile__role='coordinator')
     )
-    # 建议此处关联新的 PresentationSlot
     presentation_slot = models.ForeignKey(PresentationSlot, on_delete=models.CASCADE, null=True)
     unavailable_slots = models.JSONField(default=list, blank=True)
 
