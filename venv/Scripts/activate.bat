@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=F:\school\FYP\Timetable\venv
+set VIRTUAL_ENV=C:\Users\Eng\Desktop\FYP 2\FYP-SYSTEM\venv
 
 if not defined PROMPT set PROMPT=$P$G
 
